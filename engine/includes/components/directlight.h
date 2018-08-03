@@ -1,7 +1,7 @@
 #ifndef DIRECTLIGHT_H
 #define DIRECTLIGHT_H
 
-#include "component.h"
+#include "nativebehaviour.h"
 
 #include <amath.h>
 
@@ -9,8 +9,8 @@ class Mesh;
 class Material;
 class MaterialInstance;
 
-class NEXT_LIBRARY_EXPORT DirectLight : public Component {
-    A_REGISTER(DirectLight, Component, Components);
+class NEXT_LIBRARY_EXPORT DirectLight : public NativeBehaviour {
+    A_REGISTER(DirectLight, NativeBehaviour, Components);
 
     A_PROPERTIES(
         A_PROPERTY(bool,    Cast_shadows,   DirectLight::castShadows, DirectLight::setCastShadows),

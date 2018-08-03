@@ -45,7 +45,7 @@ Project {
         Depends { name: "bundle" }
         bundle.isBundle: false
 
-        cpp.defines: [ "ANGELSCRIPT_EXPORT" ]
+        cpp.defines: [ "ANGELSCRIPT_EXPORT", "AS_NO_COMPILER" ]
         cpp.includePaths: angelscript.incPaths
         cpp.cxxLanguageVersion: "c++14"
 

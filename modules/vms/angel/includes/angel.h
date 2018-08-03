@@ -17,6 +17,8 @@ public:
 
     ISystem                    *system                  ();
 
+    IConverter                 *converter               ();
+
 protected:
     Engine                     *m_pEngine;
 

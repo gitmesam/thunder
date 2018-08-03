@@ -36,8 +36,13 @@ CommandBufferGL::CommandBufferGL() {
 
     m_ModelLocation = glGetUniformLocation(m_Static, "t_model");
 
+#if GL_ES_VERSION_2_0
     glGenProgramPipelinesEXT(1, &m_Pipeline);
     glUseProgramStagesEXT(m_Pipeline, GL_VERTEX_SHADER_BIT_EXT, m_Static);
+#else
+    glGenProgramPipelines(1, &m_Pipeline);
+    glUseProgramStages(m_Pipeline, GL_VERTEX_SHADER_BIT, m_Static);
+#endif
 }
 
 CommandBufferGL::~CommandBufferGL() {
@@ -129,10 +134,13 @@ void CommandBufferGL::drawMesh(const Matrix4 &model, Mesh *mesh, uint32_t surfac
                 }
                 i++;
             }
-
+#if GL_ES_VERSION_2_0
             glUseProgramStagesEXT(m_Pipeline, GL_FRAGMENT_SHADER_BIT_EXT, program);
             glBindProgramPipelineEXT(m_Pipeline);
-
+#else
+            glUseProgramStages(m_Pipeline, GL_FRAGMENT_SHADER_BIT, program);
+            glBindProgramPipeline(m_Pipeline);
+#endif
             glBindVertexArray(id);
 
             Mesh::Modes mode    = mesh->mode(surface);
@@ -153,8 +161,11 @@ void CommandBufferGL::drawMesh(const Matrix4 &model, Mesh *mesh, uint32_t surfac
             glBindVertexArray(0);
 
             mat->unbind(layer);
-
+#if GL_ES_VERSION_2_0
             glBindProgramPipelineEXT(0);
+#else
+            glBindProgramPipeline(0);
+#endif
         }
     }
 }

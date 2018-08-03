@@ -14,7 +14,7 @@
 
 #include <components/actor.h>
 #include <components/scene.h>
-#include <components/component.h>
+#include <components/nativebehaviour.h>
 #include <components/camera.h>
 #include <components/directlight.h>
 
@@ -183,7 +183,7 @@ void APipeline::resize(uint32_t width, uint32_t height) {
 void APipeline::combineComponents(Object &object) {
     for(auto &it : object.getChildren()) {
         Object *child   = it;
-        Component *draw = dynamic_cast<Component *>(child);
+        NativeBehaviour *draw   = dynamic_cast<NativeBehaviour *>(child);
         if(draw) {
             if(draw->isEnable()) {
                 m_ComponentList.push_back(draw);

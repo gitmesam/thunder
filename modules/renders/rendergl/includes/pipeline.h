@@ -14,7 +14,7 @@
 class Engine;
 class BaseController;
 
-class Component;
+class NativeBehaviour;
 class DirectLight;
 class ACameraGL;
 class ASpriteGL;
@@ -82,7 +82,7 @@ protected:
 
     Vector3                     m_World;
 
-    list<Component *>           m_ComponentList;
+    list<NativeBehaviour *>     m_ComponentList;
 
     list<APostProcessor *>      m_PostEffects;
 

@@ -1,7 +1,7 @@
 #include "components/scene.h"
 
 #include "components/actor.h"
-#include "components/component.h"
+#include "components/nativebehaviour.h"
 
 Scene::Scene() :
     m_Ambient(0.2f) {
@@ -19,7 +19,7 @@ void Scene::update() {
 void Scene::startComponents(Object &object) {
     for(auto &it : object.getChildren()) {
         Object *child  = it;
-        Component *comp     = dynamic_cast<Component *>(child);
+        NativeBehaviour *comp   = dynamic_cast<NativeBehaviour *>(child);
         if(comp) {
             comp->start();
         } else {
@@ -31,7 +31,7 @@ void Scene::startComponents(Object &object) {
 void Scene::updateComponents(Object &object) {
     for(auto &it : object.getChildren()) {
         Object *child  = it;
-        Component *comp     = dynamic_cast<Component *>(child);
+        NativeBehaviour *comp   = dynamic_cast<NativeBehaviour *>(child);
         if(comp && comp->isEnable()) {
             comp->update();
         } else {

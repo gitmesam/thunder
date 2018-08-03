@@ -3,10 +3,10 @@
 
 #include <array>
 
-#include "component.h"
+#include "nativebehaviour.h"
 
-class NEXT_LIBRARY_EXPORT Camera : public Component {
-    A_REGISTER(Camera, Component, Components);
+class NEXT_LIBRARY_EXPORT Camera : public NativeBehaviour {
+    A_REGISTER(Camera, NativeBehaviour, Components);
 
     A_PROPERTIES(
         A_PROPERTY(float, Fov,  Camera::fov, Camera::setFov),

@@ -2,6 +2,10 @@
 
 #include "angelsystem.h"
 
+#ifdef BUILD_SHARED
+    #include "converters/angelconverter.h"
+#endif
+
 IModule *moduleCreate(Engine *engine) {
     return new Angel(engine);
 }
@@ -23,9 +27,20 @@ const char *Angel::version() const {
 }
 
 uint8_t Angel::types() const {
-    return SYSTEM;
+    uint8_t result  = SYSTEM;
+#ifdef BUILD_SHARED
+    result  |= CONVERTER;
+#endif
+    return result;
 }
 
 ISystem *Angel::system() {
     return new AngelSystem(m_pEngine);
+}
+
+IConverter *Angel::converter() {
+#ifdef BUILD_SHARED
+    return new AngelConverter();
+#endif
+    return nullptr;
 }

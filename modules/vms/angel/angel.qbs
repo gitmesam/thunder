@@ -9,7 +9,8 @@ Project {
 
         "includes/*.h",
         "includes/components/*.h",
-        "includes/resources/*.h"
+        "includes/resources/*.h",
+        "../../../thirdparty/angelscript/modules/*/*.cpp"
     ]
 
     property stringList incPaths: [
@@ -21,7 +22,8 @@ Project {
         "../../../engine/includes",
         "../../../engine/includes/resources",
         "../../../engine/includes/converters",
-        "../../../thirdparty/angelscript/inc"
+        "../../../thirdparty/angelscript/include",
+        "../../../thirdparty/angelscript/modules"
     ]
 
     DynamicLibrary {
@@ -37,6 +39,7 @@ Project {
         Depends { name: "next-editor" }
         Depends { name: "engine-editor" }
         Depends { name: "angelscript-editor" }
+        Depends { name: "Qt"; submodules: ["core", "gui"]; }
         bundle.isBundle: false
 
         cpp.defines: ["BUILD_SHARED", "NEXT_LIBRARY"]

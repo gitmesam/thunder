@@ -61,11 +61,14 @@ bool SceneView::isGame() const {
 void SceneView::initializeGL() {
     m_Systems.push_back(PluginModel::instance()->createSystem("Media"));
     m_Systems.push_back(PluginModel::instance()->createSystem("RenderGL"));
+    m_Systems.push_back(PluginModel::instance()->createSystem("AngelScript"));
 
     foreach(ISystem *it, m_Systems) {
-        it->init();
-        if(m_pController) {
-            it->overrideController(m_pController);
+        if(it) {
+            it->init();
+            if(m_pController) {
+                it->overrideController(m_pController);
+            }
         }
     }
 
@@ -81,7 +84,9 @@ void SceneView::paintGL() {
         m_pScene->update();
         uint32_t handle = defaultFramebufferObject();
         foreach(ISystem *it, m_Systems) {
-            it->update(*m_pScene, handle);
+            if(it) {
+                it->update(*m_pScene, handle);
+            }
         }
     }
 }
@@ -90,7 +95,9 @@ void SceneView::resizeGL(int width, int height) {
     QOpenGLWidget::resizeGL(width, height);
 
     foreach(ISystem *it, m_Systems) {
-        it->resize(width, height);
+        if(it) {
+            it->resize(width, height);
+        }
     }
 }
 
