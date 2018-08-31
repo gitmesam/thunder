@@ -20,9 +20,9 @@ public:
     ObjectSystem                        (const string &name = "system");
     ~ObjectSystem                       ();
 
-    virtual int32_t                     exec                    ();
-
     GroupMap                            factories               () const;
+
+    const MetaObject                   *metaFactory             (const string &uri) const;
 
 public:
     static ObjectSystem                *instance                ();
@@ -40,6 +40,10 @@ public:
         string uri  = string("thor://") + group + "/" + name;
         ObjectSystem *inst = ObjectSystem::instance();
         inst->factoryAdd(name, uri, meta);
+
+        if(MetaType::type(name.c_str()) == 0) {
+            registerMetaType<T>(name.c_str());
+        }
 
         name += " *";
         if(MetaType::type(name.c_str()) == 0) {

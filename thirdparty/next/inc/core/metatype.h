@@ -35,13 +35,12 @@ public:
 
     struct Table {
         int                 (*get_size)                 ();
-        void                (*static_new)               (void**);
-        void                (*construct)                (void**);
-        void                (*static_delete)            (void**);
-        void                (*destruct)                 (void**);
-        void                (*clone)                    (const void**, void**);
-        void                (*move)                     (const void**, void**);
-        bool                (*compare)                  (const void**, const void**);
+        void               *(*static_new)               ();
+        void                (*construct)                (void *);
+        void                (*static_delete)            (void **);
+        void                (*destruct)                 (void *);
+        void                (*clone)                    (const void **, void **);
+        bool                (*compare)                  (const void **, const void **);
         type_index const    (*index)                    ();
         const char         *name;
     };
@@ -83,6 +82,8 @@ public:
     static bool             registerConverter           (uint32_t from, uint32_t to, converterCallback function);
     static bool             hasConverter                (uint32_t from, uint32_t to);
 
+    static Table           *table                       (uint32_t type);
+
 private:
     const Table            *m_pTable;
 
@@ -94,28 +95,24 @@ struct TypeFuncs {
     static int size() {
         return sizeof(T);
     }
-    static void static_new(void** dest) {
-        *dest = new T();
+    static void *static_new() {
+        return new T();
     }
-    static void static_delete(void** x) {
-        delete (*reinterpret_cast<T**>(x));
+    static void static_delete(void **x) {
+        delete (*reinterpret_cast<T **>(x));
     }
-    static void construct(void** dest) {
-        new (*dest) T();
+    static void construct(void *dest) {
+        new (dest) T();
     }
-    static void destruct(void** x) {
+    static void destruct(void *x) {
         A_UNUSED(x)
-        (*reinterpret_cast<T**>(x))->~T();
+        (reinterpret_cast<T *>(x))->~T();
     }
-    static void clone(const void** src, void** dest) {
-        *dest = new T(**reinterpret_cast<const T**>(src));
+    static void clone(const void **src, void **dest) {
+        *dest = new T(**reinterpret_cast<const T **>(src));
     }
-    static void move(const void** src, void** dest) {
-        **reinterpret_cast<T**>(dest) =
-            **reinterpret_cast<const T**>(src);
-    }
-    static bool compare(const void** left, const void** right) {
-        return (**reinterpret_cast<const T**>(left) == **reinterpret_cast<const T**>(right));
+    static bool compare(const void **left, const void **right) {
+        return (**reinterpret_cast<const T **>(left) == **reinterpret_cast<const T **>(right));
     }
     static type_index const index() {
         return type_index(typeid(T));
@@ -164,7 +161,6 @@ struct Table {
             TypeFuncs<T_no_cv>::static_delete,
             TypeFuncs<T_no_cv>::destruct,
             TypeFuncs<T_no_cv>::clone,
-            TypeFuncs<T_no_cv>::move,
             TypeFuncs<T_no_cv>::compare,
             TypeFuncs<T_no_cv>::index,
             typeName

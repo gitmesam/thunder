@@ -28,6 +28,11 @@ Project {
             cpp.sonamePrefix: "@executable_path"
         }
 
+        Properties {
+            condition: qbs.architecture === "x86_64" && qbs.targetOS.contains("windows")
+            files: outer.concat(["source/as_callfunc_x64_msvc_asm.asm"])
+        }
+
         Group {
             name: "Install Dynamic Platform"
             fileTagsFilter: ["dynamiclibrary", "dynamiclibrary_import"]

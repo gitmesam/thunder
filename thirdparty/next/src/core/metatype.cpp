@@ -24,7 +24,6 @@
         TypeFuncs<TYPE>::static_delete, \
         TypeFuncs<TYPE>::destruct, \
         TypeFuncs<TYPE>::clone, \
-        TypeFuncs<TYPE>::move, \
         TypeFuncs<TYPE>::compare, \
         TypeFuncs<TYPE>::index, \
         #TYPE \
@@ -428,7 +427,7 @@ void *MetaType::construct(void *where, const void *copy) const {
     if(copy) {
         m_pTable->clone(&copy, &where);
     } else {
-        m_pTable->construct(&where);
+        m_pTable->construct(where);
     }
     return where;
 }
@@ -442,7 +441,7 @@ void *MetaType::create(const void *copy) const {
     if(copy) {
         m_pTable->clone(&copy, &where);
     } else {
-        m_pTable->static_new(&where);
+        where   = m_pTable->static_new();
     }
     return where;
 }
@@ -460,7 +459,7 @@ void MetaType::destroy(void *data) const {
 */
 void MetaType::destruct(void *data) const {
     PROFILE_FUNCTION()
-    m_pTable->destruct(&data);
+    m_pTable->destruct(data);
 }
 /*!
     Returns true in case of \a left value is equal to \a right value; otherwise returns false.
@@ -645,4 +644,15 @@ bool MetaType::hasConverter(uint32_t from, uint32_t to) {
         }
     }
     return false;
+}
+/*!
+    Returns type information table if type registered; otherwise returns nullptr.
+*/
+MetaType::Table *MetaType::table(uint32_t type) {
+    PROFILE_FUNCTION()
+    auto it = s_Types.find(type);
+    if(it != s_Types.end()) {
+        return &(it->second);
+    }
+    return nullptr;
 }

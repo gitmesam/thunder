@@ -7,6 +7,9 @@
 
 #include "resources/angelscript.h"
 
+class asSMessageInfo;
+class asIScriptEngine;
+
 class AngelSerial : public AngelScript {
 public:
     VariantMap                  saveUserData                () const;

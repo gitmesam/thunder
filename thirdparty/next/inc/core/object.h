@@ -157,6 +157,13 @@ public:
 
     virtual VariantMap              saveUserData                () const;
 
+    virtual bool                    operator==                  (const Object &) const final { return false; }
+    virtual bool                    operator!=                  (const Object &) const final { return false; }
+
+    virtual Object                 &operator=                   (Object &) final;
+
+    Object                          (const Object &) final;
+
 protected:
     void                            emitSignal                  (const char *signal, const Variant &args = Variant());
     void                            postEvent                   (Event *event);
@@ -176,12 +183,8 @@ private:
 
     void                            setUUID                     (uint32_t id);
 
-    bool                            operator==                  (const Object &) const { return false; }
-    bool                            operator!=                  (const Object &) const { return false; }
 
-    Object                         &operator=                   (Object &);
 
-    Object                          (const Object &);
 };
 
 #endif // Object_H

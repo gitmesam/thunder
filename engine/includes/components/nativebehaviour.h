@@ -3,13 +3,21 @@
 
 #include "components/component.h"
 
+#include "system.h"
+
 class NEXT_LIBRARY_EXPORT NativeBehaviour : public Component {
+    A_REGISTER(NativeBehaviour, Component, Components);
+
+    A_NOPROPERTIES();
+    A_NOMETHODS();
+
 public:
     virtual void                start                   ();
 
     virtual void                update                  ();
 
     virtual void                draw                    (ICommandBuffer &buffer, int8_t layer);
+
 };
 
 #endif // NATIVEBEHAVIOUR_H

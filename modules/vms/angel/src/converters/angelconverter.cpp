@@ -13,7 +13,7 @@
 
 class CBytecodeStream : public asIBinaryStream {
 public:
-    CBytecodeStream(ByteArray *ptr) :
+    CBytecodeStream(ByteArray &ptr) :
         array(ptr) {
 
     }
@@ -21,9 +21,9 @@ public:
         if( size == 0 ) {
             return size;
         }
-        uint32_t offset = array->size();
-        array->resize(offset + size);
-        memcpy(&array[offset - 1], ptr, size);
+        uint32_t offset = array.size();
+        array.resize(offset + size);
+        memcpy(&array[offset], ptr, size);
 
         return size;
     }
@@ -31,7 +31,7 @@ public:
         return 0;
     }
 protected:
-    ByteArray        *array;
+    ByteArray        &array;
 };
 
 VariantMap AngelSerial::saveUserData() const {
@@ -55,17 +55,23 @@ uint8_t AngelConverter::convertFile(IConverterSettings *settings) {
 
     QFile file(settings->source());
     if(file.open( QIODevice::ReadOnly)) {
-        mod->AddScriptSection("AngelBehaviour", file.readAll().data());
-        if(mod->Build() >= 0) {
-            AngelSerial serial;
-            serial.m_Array.clear();
-            CBytecodeStream stream(&serial.m_Array);
-            mod->SaveByteCode(&stream);
-
-            ByteArray data  = Bson::save( Engine::toVariant(&serial) );
-            file.write((const char *)&data[0], data.size());
-        }
+        mod->AddScriptSection("AngelData", file.readAll().data());
         file.close();
+
+        if(mod->Build() >= 0) {
+            QFile dst(settings->absoluteDestination());
+            if(dst.open( QIODevice::WriteOnly)) {
+                AngelSerial serial;
+                serial.m_Array.clear();
+                CBytecodeStream stream(serial.m_Array);
+                mod->SaveByteCode(&stream);
+
+                ByteArray data  = Bson::save( Engine::toVariant(&serial) );
+
+                dst.write((const char *)&data[0], data.size());
+                dst.close();
+            }
+        }
     }
 
     return 0;

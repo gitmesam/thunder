@@ -181,7 +181,6 @@ int32_t Engine::exec() {
             level->setParent(scene);
         }
 
-        Log(Log::DBG) << "Looking camera...";
         Camera *component   = scene->findChild<Camera *>();
         if(component == nullptr) {
             Log(Log::DBG) << "Camera not found creating new one.";

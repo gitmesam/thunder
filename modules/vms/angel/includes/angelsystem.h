@@ -4,9 +4,12 @@
 #include <system.h>
 
 class asIScriptEngine;
+class asIScriptModule;
 class asIScriptContext;
 
 class asSMessageInfo;
+
+class MetaObject;
 
 class AngelSystem : public ISystem {
 public:
@@ -24,10 +27,13 @@ public:
     void                        resize                      (uint32_t, uint32_t);
 
     static void                 registerClasses             (asIScriptEngine *engine);
+
 protected:
     static void                 messageCallback             (const asSMessageInfo *msg, void *param);
 
     asIScriptEngine            *m_pScriptEngine;
+
+    asIScriptModule            *m_pScriptModule;
 
     asIScriptContext           *m_pContext;
 };
