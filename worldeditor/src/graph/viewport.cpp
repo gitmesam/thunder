@@ -8,6 +8,8 @@
 
 #include "commandbuffer.h"
 
+#include "pluginmodel.h"
+
 Viewport::Viewport(QWidget *parent) :
         SceneView(parent),
         m_pCommandBuffer(nullptr)  {
@@ -24,6 +26,8 @@ void Viewport::initializeGL() {
         static_cast<CameraCtrl *>(m_pController)->init(m_pScene);
     }
     SceneView::initializeGL();
+
+    m_Systems.push_back(PluginModel::instance()->createSystem("AngelScript"));
 
     makeCurrent();
 

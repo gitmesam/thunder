@@ -12,7 +12,12 @@ class AngelBehaviour : public NativeBehaviour {
     A_PROPERTIES(
         A_PROPERTY(string, Script, AngelBehaviour::script, AngelBehaviour::setScript)
     );
-    A_NOMETHODS();
+
+    A_METHODS(
+        A_METHOD(Actor *, actor),
+        A_METHOD(void, test)
+    );
+
 
 public:
     AngelBehaviour              ();
@@ -30,6 +35,10 @@ public:
 
     asIScriptFunction          *scriptUpdate            () const;
     void                        setScriptUpdate         (asIScriptFunction *function);
+
+    Actor                      *actor                   () const;
+
+    void                        test                    () const;
 
 protected:
     string                      m_Script;

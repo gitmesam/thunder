@@ -36,23 +36,24 @@
 #define A_REGISTER(Class, Super, Group) \
     A_OBJECT(Class, Super) \
 public: \
-    static void                     registerClassFactory    () { \
-        ObjectSystem::factoryAdd<Class>(#Group, Class::metaClass()); \
+    static void                     registerClassFactory    (ObjectSystem *system) { \
+        REGISTER_META_TYPE(Class); \
+        system->factoryAdd<Class>(#Group, Class::metaClass()); \
     } \
-    static void                     unregisterClassFactory  () { \
-        ObjectSystem::factoryRemove<Class>(#Group); \
+    static void                     unregisterClassFactory  (ObjectSystem *system) { \
+        system->factoryRemove<Class>(#Group); \
     }
 
 
 #define A_OVERRIDE(Class, Super, Group) \
     A_OBJECT(Class, Super) \
 public: \
-    static void                     registerClassFactory    () { \
-        ObjectSystem::factoryAdd<Super>(#Group, Class::metaClass()); \
+    static void                     registerClassFactory    (ObjectSystem *system) { \
+        system->factoryAdd<Super>(#Group, Class::metaClass()); \
     } \
-    static void                     unregisterClassFactory  () { \
-        ObjectSystem::factoryRemove<Super>(#Group); \
-        ObjectSystem::factoryAdd<Super>(#Group, Super::metaClass()); \
+    static void                     unregisterClassFactory  (ObjectSystem *system) { \
+        system->factoryRemove<Super>(#Group); \
+        system->factoryAdd<Super>(#Group, Super::metaClass()); \
     } \
     virtual string                  typeName                () const { \
         return Super::metaClass()->name(); \
@@ -89,7 +90,7 @@ public:
     static const MetaObject        *metaClass                   ();
     virtual const MetaObject       *metaObject                  () const;
 
-    virtual Object                 *clone                       ();
+    Object                         *clone                       (Object *parent = nullptr);
 
     Object                         *parent                      () const;
 
@@ -157,6 +158,10 @@ public:
 
     virtual VariantMap              saveUserData                () const;
 
+    virtual bool                    isSerializable              () const;
+
+    uint32_t                        clonedFrom                  () const;
+
     virtual bool                    operator==                  (const Object &) const final { return false; }
     virtual bool                    operator!=                  (const Object &) const final { return false; }
 
@@ -168,6 +173,8 @@ protected:
     void                            emitSignal                  (const char *signal, const Variant &args = Variant());
     void                            postEvent                   (Event *event);
 
+    virtual void                    addChild                    (Object *value);
+
     Object                         *sender                      () const;
 
 private:
@@ -176,15 +183,11 @@ private:
     friend class ObjectSystem;
 
 private:
-    void                            processEvents               ();
+    virtual void                    processEvents               ();
 
-    void                            addChild                    (Object *value);
     void                            removeChild                 (Object *value);
 
     void                            setUUID                     (uint32_t id);
-
-
-
 };
 
 #endif // Object_H

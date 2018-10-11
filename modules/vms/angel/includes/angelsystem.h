@@ -6,6 +6,8 @@
 class asIScriptEngine;
 class asIScriptModule;
 class asIScriptContext;
+class asIScriptFunction;
+class asIScriptObject;
 
 class asSMessageInfo;
 
@@ -29,6 +31,8 @@ public:
     static void                 registerClasses             (asIScriptEngine *engine);
 
 protected:
+    void                        execute                     (asIScriptObject *object, asIScriptFunction *func);
+
     static void                 messageCallback             (const asSMessageInfo *msg, void *param);
 
     asIScriptEngine            *m_pScriptEngine;

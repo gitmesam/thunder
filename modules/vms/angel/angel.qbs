@@ -4,10 +4,12 @@ Project {
     id: angel
     property stringList srcFiles: [
         "src/*.cpp",
+        "src/bindings/*.cpp",
         "src/components/*.cpp",
         "src/resources/*.cpp",
 
         "includes/*.h",
+        "includes/bindings/*.h",
         "includes/components/*.h",
         "includes/resources/*.h",
         "../../../thirdparty/angelscript/modules/*/*.cpp"

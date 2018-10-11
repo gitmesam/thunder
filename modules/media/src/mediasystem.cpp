@@ -18,9 +18,9 @@ MediaSystem::MediaSystem(Engine *engine) :
         ISystem(engine) {
     PROFILER_MARKER;
 
-    AudioSource::registerClassFactory();
+    AudioSource::registerClassFactory(engine);
 
-    AudioClip::registerClassFactory();
+    AudioClip::registerClassFactory(engine);
 }
 
 MediaSystem::~MediaSystem() {

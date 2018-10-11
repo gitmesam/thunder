@@ -29,7 +29,6 @@
         #TYPE \
     }
 
-typedef map<uint32_t, MetaType::Table>  TypeMap;
 typedef map<string, uint32_t>           NameMap;
 typedef map<uint32_t, map<uint32_t, MetaType::converterCallback> > ConverterMap;
 
@@ -259,7 +258,7 @@ bool toQuaternion(void *to, const void *from, const uint32_t fromType) {
 }
 
 uint32_t MetaType::s_NextId = MetaType::USERTYPE;
-static TypeMap s_Types = {
+static MetaType::TypeMap s_Types = {
     {MetaType::BOOLEAN,     DECLARE_BUILT_TYPE(bool)},
     {MetaType::INTEGER,     DECLARE_BUILT_TYPE(int)},
     {MetaType::FLOAT,       DECLARE_BUILT_TYPE(float)},
@@ -655,4 +654,10 @@ MetaType::Table *MetaType::table(uint32_t type) {
         return &(it->second);
     }
     return nullptr;
+}
+/*!
+    Returns a table of registered types.
+*/
+MetaType::TypeMap MetaType::types() {
+    return s_Types;
 }

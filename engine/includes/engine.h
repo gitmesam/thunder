@@ -52,12 +52,8 @@ public:
     bool                        createWindow                ();
 
     IController                *controller                  ();
-    /*!
-        Get FileIO object.
 
-        @return                 Pointer to file system object.
-    */
-    IFile                      *file                        ();
+    static IFile               *file                        ();
 
     static string               locationAppDir              ();
 

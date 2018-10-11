@@ -61,7 +61,6 @@ bool SceneView::isGame() const {
 void SceneView::initializeGL() {
     m_Systems.push_back(PluginModel::instance()->createSystem("Media"));
     m_Systems.push_back(PluginModel::instance()->createSystem("RenderGL"));
-    m_Systems.push_back(PluginModel::instance()->createSystem("AngelScript"));
 
     foreach(ISystem *it, m_Systems) {
         if(it) {

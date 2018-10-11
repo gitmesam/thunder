@@ -15,6 +15,8 @@
 
 #include <resources/angelscript.h>
 
+#include "bindings/angelmath.h"
+
 class AngelStream : public asIBinaryStream {
 public:
     AngelStream(ByteArray &ptr) :
@@ -44,9 +46,9 @@ AngelSystem::AngelSystem(Engine *engine) :
         m_pContext(nullptr) {
     PROFILER_MARKER;
 
-    AngelScript::registerClassFactory();
+    AngelScript::registerClassFactory(engine);
 
-    AngelBehaviour::registerClassFactory();
+    AngelBehaviour::registerClassFactory(engine);
 }
 
 AngelSystem::~AngelSystem() {
@@ -100,38 +102,45 @@ void AngelSystem::update(Scene &scene, uint32_t) {
                 asITypeInfo *type   = m_pScriptModule->GetTypeInfoByDecl(value.c_str());
                 if(type) {
                     string stream   = value + " @+" + value + "()";
-                    asIScriptFunction *factory  = type->GetFactoryByDecl(stream.c_str());
+                    execute(object, type->GetFactoryByDecl(stream.c_str()));
 
-                    m_pContext->Prepare(factory);
-                    m_pContext->Execute();
-
-                    object  = *(asIScriptObject**)m_pContext->GetAddressOfReturnValue();
+                    asIScriptObject **obj   = (asIScriptObject**)m_pContext->GetAddressOfReturnValue();
+                    if(obj == nullptr) {
+                        continue;
+                    }
+                    object  = *obj;
                     if(object) {
                         object->AddRef();
 
-                        it->setScriptStart(type->GetMethodByDecl("void start()"));
-                        it->setScriptStart(type->GetMethodByDecl("void update()"));
+                        it->setScriptStart  (type->GetMethodByDecl("void start()"));
+                        it->setScriptUpdate (type->GetMethodByDecl("void update()"));
 
                         it->setScriptObject(object);
                         if(object->GetPropertyCount() > 0) {
-                            AngelBehaviour *o   = it;
-                            memcpy(reinterpret_cast<AngelBehaviour**>(object->GetAddressOfProperty(0)), &o, sizeof(void *));
+                            AngelBehaviour **behaviour = reinterpret_cast<AngelBehaviour**>(object->GetAddressOfProperty(0));
+                            memcpy(behaviour, &(it), sizeof(void *));
                         }
+
+                        execute(object, it->scriptStart());
                     } else {
                         Log(Log::ERR) << "Can't create an object" << value.c_str();
                     }
                 }
             }
 
-            if(object) {
-                asIScriptFunction *func = it->scriptUpdate();
-                if(func) {
-                    m_pContext->Prepare(func);
-                    m_pContext->SetObject(object);
-                    m_pContext->Execute();
-                }
-            }
+            execute(object, it->scriptUpdate());
+        }
+    }
+}
 
+void AngelSystem::execute(asIScriptObject *object, asIScriptFunction *func) {
+    if(func) {
+        m_pContext->Prepare(func);
+        if(object) {
+            m_pContext->SetObject(object);
+        }
+        if(m_pContext->Execute() == asEXECUTION_EXCEPTION) {
+            Log(Log::ERR) << "Unhandled Exception:" << m_pContext->GetExceptionString();
         }
     }
 }
@@ -151,41 +160,88 @@ void AngelSystem::registerClasses(asIScriptEngine *engine) {
 
     RegisterStdString(engine);
 
-    ObjectSystem *system  = Engine::instance();
-    for(auto &it: system->factories()) {
-        const char *name    = it.first.c_str();
+    registerMath(engine);
 
-        const MetaObject *meta  = system->metaFactory(name);
+    for(auto &it : MetaType::types()) {
+        if(it.first > MetaType::USERTYPE) {
+            MetaType::Table &table  = it.second;
+            MetaType type(&table);
+            const char *name        = type.name();
+            if(name[strlen(name) - 1] != '*') {
+                engine->RegisterObjectType(name, 0, asOBJ_REF | asOBJ_NOCOUNT);
+                string stream   = string(name) + "@ f()";
+                engine->RegisterObjectBehaviour(name, asBEHAVE_FACTORY, stream.c_str(), asFUNCTION(table.static_new), asCALL_CDECL);
+                //engine->RegisterObjectBehaviour(name, asBEHAVE_ADDREF, "void f()", asMETHOD(CRef,AddRef), asCALL_THISCALL);
+                //engine->RegisterObjectBehaviour(name, asBEHAVE_RELEASE, "void f()", asMETHOD(CRef,Release), asCALL_THISCALL);
+            }
+        }
+    }
 
-        uint32_t type   = MetaType::type(name);
-        uint32_t size   = MetaType::size(type);
+    ObjectSystem system;
+    for(auto &it: system.factories()) {
+        const char *typeName    = it.first.c_str();
+        const MetaObject *meta  = system.metaFactory(typeName);
+
+        uint32_t type   = MetaType::type(typeName);
         MetaType::Table *table  = MetaType::table(type);
-        if(size && table) {
-            //int r   = engine->RegisterObjectType(name, size, asOBJ_VALUE);
-            //r = engine->RegisterObjectBehaviour(name, asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(table->construct), asCALL_CDECL_OBJLAST);
-            //r = engine->RegisterObjectBehaviour(name, asBEHAVE_DESTRUCT,  "void f()", asFUNCTION(table->destruct),  asCALL_CDECL_OBJLAST);
-
-            int r   = engine->RegisterObjectType(name, 0, asOBJ_REF | asOBJ_NOCOUNT);
-            string stream   = string(name) + "@ f()";
-            r = engine->RegisterObjectBehaviour(name, asBEHAVE_FACTORY, stream.c_str(), asFUNCTION(table->static_new), asCALL_CDECL);
-            //r = engine->RegisterObjectBehaviour(name, asBEHAVE_ADDREF, "void f()", asMETHOD(CRef,AddRef), asCALL_THISCALL);
-            //r = engine->RegisterObjectBehaviour(name, asBEHAVE_RELEASE, "void f()", asMETHOD(CRef,Release), asCALL_THISCALL);
-/*
+        if(table) {
             for(uint32_t m = 0; m < meta->methodCount(); m++) {
                 MetaMethod method   = meta->method(m);
                 if(method.isValid()) {
-                    asSFuncPtr ptr(3);
-                    ptr.CopyMethodPtr(method., SINGLE_PTR_SIZE+4*sizeof(int));
+                    MetaType ret    = method.returnType();
+                    string retName;
+                    if(ret.isValid()) {
+                        retName = ret.name();
+                        retName += ' ';
+                    } else {
+                        retName = "void ";
+                    }
 
-                    r = engine->RegisterObjectMethod(it.first.c_str(),
-                                                     method.signature().c_str(),
-                                                     ptr,
-                                                     asCALL_THISCALL); assert( r >= 0 );
+                    asSFuncPtr ptr(3);
+                    method.table()->address(ptr.ptr.dummy, sizeof(void *));
+
+                    string signature    = retName + method.signature();
+                    for(auto &it : signature) {
+                        if(it == '*') {
+                            it = '@';
+                        }
+                    }
+
+                    engine->RegisterObjectMethod(typeName,
+                                                 signature.c_str(),
+                                                 ptr,
+                                                 asCALL_THISCALL);
                 }
             }
-*/
-        } else {
-            Log(Log::ERR) << "Can't register" << it.first.c_str() << "masked to" << meta->name();
+
+            for(uint32_t p = 0; p < meta->propertyCount(); p++) {
+                MetaProperty property = meta->property(p);
+                if(property.isValid()) {
+
+                    MetaType type   = property.type();
+                    string name =  type.name();
+
+                    string get  = name + " &get_" + property.name() + "()";
+                    string set  = string("void set_") + property.name() + "(" + name + ((MetaType::type(type.name()) < MetaType::STRING) ? "" : " &in") + ")";
+
+                    asSFuncPtr ptr1(3);
+                    property.table()->readmem(ptr1.ptr.dummy, sizeof(void *));
+
+                    asSFuncPtr ptr2(3);
+                    property.table()->writemem(ptr2.ptr.dummy, sizeof(void *));
+
+                    engine->RegisterObjectMethod(typeName,
+                                                 get.c_str(),
+                                                 ptr1,
+                                                 asCALL_THISCALL);
+
+                    engine->RegisterObjectMethod(typeName,
+                                                 set.c_str(),
+                                                 ptr2,
+                                                 asCALL_THISCALL);
+                }
+            }
+
         }
     }
 }

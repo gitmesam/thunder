@@ -1,7 +1,8 @@
-#ifndef MetaType_H
-#define MetaType_H
+#ifndef METATYPE_H
+#define METATYPE_H
 
 #include <map>
+#include <unordered_map>
 #include <typeinfo>
 #include <typeindex>
 #include <stdint.h>
@@ -9,6 +10,12 @@
 #include <common.h>
 
 using namespace std;
+
+#define REGISTER_META_TYPE(Class) \
+    REGISTER_META_TYPE_IMPL(Class); \
+    REGISTER_META_TYPE_IMPL(Class *);
+
+#define REGISTER_META_TYPE_IMPL(Class) registerMetaType<Class>(#Class)
 
 class NEXT_LIBRARY_EXPORT MetaType {
 public:
@@ -47,6 +54,8 @@ public:
 
     typedef bool            (*converterCallback)        (void *to, const void *from, const uint32_t fromType);
 
+    typedef unordered_map<uint32_t, Table>              TypeMap;
+
 public:
     MetaType               (const Table *table);
 
@@ -83,6 +92,8 @@ public:
     static bool             hasConverter                (uint32_t from, uint32_t to);
 
     static Table           *table                       (uint32_t type);
+
+    static TypeMap          types                       ();
 
 private:
     const Table            *m_pTable;
@@ -145,7 +156,8 @@ struct CheckType<T, True> {
 
 template<typename T>
 struct CheckType<T, False> {
-    typedef typename std::remove_cv<T>::type type;
+    typedef typename std::remove_cv<
+            typename std::remove_reference<T>::type>::type type;
 };
 
 template<typename T>
@@ -171,7 +183,12 @@ struct Table {
 
 //Function to unpack args properly
 template<typename T>
-inline static MetaType::Table *getTable(const char *typeName) {
+inline static MetaType::Table *getTable(const char *typeName = "") {
+    uint32_t type   = MetaType::type<T>();
+    MetaType::Table *result   = MetaType::table(type);
+    if(result) {
+        return result;
+    }
     return Table<T>::get(typeName);
 }
 
@@ -180,4 +197,4 @@ static uint32_t registerMetaType(const char *typeName) {
     return MetaType::registerType(*getTable<T>(typeName));
 }
 
-#endif // MetaType_H
+#endif // METATYPE_H

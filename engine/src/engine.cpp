@@ -57,7 +57,6 @@ public:
     static unordered_map<Object*, string>   m_ReferenceCache;
 
     EnginePrivate() :
-        m_pFile(nullptr),
         m_Controller(nullptr),
         m_Valid(false) {
 
@@ -67,7 +66,7 @@ public:
 
     IController                *m_Controller;
 
-    IFile                      *m_pFile;
+    static IFile               *m_pFile;
 
     bool                        m_Valid;
 
@@ -86,6 +85,8 @@ public:
     static VariantMap           m_Values;
 };
 
+IFile *EnginePrivate::m_pFile   = nullptr;
+
 unordered_map<string, string>   EnginePrivate::m_IndexMap;
 unordered_map<string, Object*>  EnginePrivate::m_ResourceCache;
 unordered_map<Object*, string>  EnginePrivate::m_ReferenceCache;
@@ -95,6 +96,8 @@ string                          EnginePrivate::m_ApplicationDir;
 string                          EnginePrivate::m_Organization;
 string                          EnginePrivate::m_Application;
 IPlatformAdaptor               *EnginePrivate::m_pPlatform;
+
+typedef Vector4 Color;
 
 Engine::Engine(IFile *file, int, char **argv) :
         p_ptr(new EnginePrivate()) {
@@ -115,25 +118,26 @@ Engine::Engine(IFile *file, int, char **argv) :
 
     p_ptr->m_Controller = new IController();
 
-    Text::registerClassFactory();
-    Texture::registerClassFactory();
-    Material::registerClassFactory();
-    Mesh::registerClassFactory();
-    Atlas::registerClassFactory();
-    Font::registerClassFactory();
+    REGISTER_META_TYPE_IMPL(MaterialArray);
+    REGISTER_META_TYPE_IMPL(Color);
 
-    Scene::registerClassFactory();
-    Chunk::registerClassFactory();
-    Actor::registerClassFactory();
-    Camera::registerClassFactory();
+    Text::registerClassFactory(this);
+    Texture::registerClassFactory(this);
+    Material::registerClassFactory(this);
+    Mesh::registerClassFactory(this);
+    Atlas::registerClassFactory(this);
+    Font::registerClassFactory(this);
 
-    StaticMesh::registerClassFactory();
-    TextMesh::registerClassFactory();
-    SpriteMesh::registerClassFactory();
-    DirectLight::registerClassFactory();
-    RenderTexture::registerClassFactory();
+    Scene::registerClassFactory(this);
+    Chunk::registerClassFactory(this);
+    Actor::registerClassFactory(this);
+    Camera::registerClassFactory(this);
 
-    registerMetaType<MaterialArray>("MaterialArray");
+    StaticMesh::registerClassFactory(this);
+    TextMesh::registerClassFactory(this);
+    SpriteMesh::registerClassFactory(this);
+    DirectLight::registerClassFactory(this);
+    RenderTexture::registerClassFactory(this);
 }
 
 Engine::~Engine() {
@@ -253,7 +257,7 @@ Object *Engine::loadResource(const string &path) {
             if(it != EnginePrivate::m_ResourceCache.end() && it->second) {
                 return it->second;
             } else {
-                IFile *file = ((Engine *)Engine::instance())->file();
+                IFile *file = EnginePrivate::m_pFile;
                 _FILE *fp   = file->_fopen(uuid.c_str(), "r");
                 if(fp) {
                     ByteArray data;
@@ -294,7 +298,7 @@ void Engine::reloadBundle() {
     PROFILER_MARKER;
     EnginePrivate::m_IndexMap.clear();
 
-    IFile *file = ((Engine *)Engine::instance())->file();
+    IFile *file = EnginePrivate::m_pFile;
     _FILE *fp   = file->_fopen(gIndex, "r");
     if(fp) {
         ByteArray data;
@@ -338,7 +342,7 @@ IController *Engine::controller() {
 IFile *Engine::file() {
     PROFILER_MARKER;
 
-    return p_ptr->m_pFile;
+    return EnginePrivate::m_pFile;
 }
 
 string Engine::locationAppDir() {

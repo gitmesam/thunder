@@ -19,12 +19,12 @@ RenderGLSystem::RenderGLSystem(Engine *engine) :
         ISystem(engine) {
     PROFILER_MARKER;
 
-    ATextureGL::registerClassFactory();
-    ARenderTextureGL::registerClassFactory();
-    AMaterialGL::registerClassFactory();
-    AMeshGL::registerClassFactory();
+    ATextureGL::registerClassFactory(engine);
+    ARenderTextureGL::registerClassFactory(engine);
+    AMaterialGL::registerClassFactory(engine);
+    AMeshGL::registerClassFactory(engine);
 
-    CommandBufferGL::registerClassFactory();
+    CommandBufferGL::registerClassFactory(engine);
 }
 
 RenderGLSystem::~RenderGLSystem() {

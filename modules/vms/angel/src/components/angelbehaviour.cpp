@@ -48,9 +48,18 @@ void AngelBehaviour::setScriptStart(asIScriptFunction *function) {
 }
 
 asIScriptFunction *AngelBehaviour::scriptUpdate() const {
-    return m_pStart;
+    return m_pUpdate;
 }
 
 void AngelBehaviour::setScriptUpdate(asIScriptFunction *function) {
-    m_pStart    = function;
+    m_pUpdate   = function;
+}
+
+Actor *AngelBehaviour::actor() const {
+    Log(Log::DBG) << "AngelBehaviour::actor";
+    return &Component::actor();
+}
+
+void AngelBehaviour::test() const {
+    Log(Log::DBG) << "AngelBehaviour::test" << (int)this;
 }
