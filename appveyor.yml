@@ -1,5 +1,5 @@
 clone_depth: 200
-version: '2018.2.{build}'
+version: '2018.3.{build}'
 
 environment:
   matrix:
@@ -35,4 +35,4 @@ deploy:
       secure: bSl/ZDdDyvSPlyBdsEEZIg==
     on:
         branch: master
-        appveyor_repo_tag: false
+        appveyor_repo_tag: true

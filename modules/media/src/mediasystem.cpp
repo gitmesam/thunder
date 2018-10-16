@@ -8,6 +8,7 @@
 #include <analytics/profiler.h>
 #include <components/camera.h>
 #include <components/actor.h>
+#include <components/transform.h>
 
 #include "components/audiosource.h"
 #include "resources/audioclip.h"
@@ -15,6 +16,7 @@
 MediaSystem::MediaSystem(Engine *engine) :
         m_pDevice(nullptr),
         m_pContext(nullptr),
+        m_pController(nullptr),
         ISystem(engine) {
     PROFILER_MARKER;
 
@@ -53,26 +55,27 @@ void MediaSystem::update(Scene &scene, uint32_t resource) {
     PROFILER_MARKER;
 
     Camera *camera  = activeCamera();
-    Actor &a    = camera->actor();
+    if(camera) {
+        Actor &a    = camera->actor();
 
-    alListenerfv(AL_POSITION,    a.position().v);
+        Transform *t    = a.transform();
 
-    Vector3 dir = a.rotation() * Vector3(0.0f, 0.0f,-1.0f);
-    Vector3 up  = a.rotation() * Vector3(0.0f, 1.0f, 0.0f);
-    float orientation[] = { dir.x, dir.y, dir.z, up.x, up.y, up.z };
+        alListenerfv(AL_POSITION,    t->worldPosition().v);
 
-    alListenerfv(AL_ORIENTATION, orientation);
+        Quaternion rot  = t->worldRotation();
+
+        Vector3 dir = rot * Vector3(0.0f, 0.0f,-1.0f);
+        Vector3 up  = rot * Vector3(0.0f, 1.0f, 0.0f);
+        float orientation[] = { dir.x, dir.y, dir.z, up.x, up.y, up.z };
+
+        alListenerfv(AL_ORIENTATION, orientation);
+    }
 }
 
 void MediaSystem::overrideController(IController *controller) {
     PROFILER_MARKER;
 
     m_pController   = controller;
-}
-
-void MediaSystem::resize(uint32_t, uint32_t) {
-    PROFILER_MARKER;
-
 }
 
 Camera *MediaSystem::activeCamera() {

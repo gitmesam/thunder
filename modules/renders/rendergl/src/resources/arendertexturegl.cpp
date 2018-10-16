@@ -1,5 +1,11 @@
 #include "resources/arendertexturegl.h"
 
+ARenderTextureGL::ARenderTextureGL() :
+        m_Buffer(0),
+        m_ID(0) {
+
+}
+
 ARenderTextureGL::~ARenderTextureGL() {
     clear();
 }
@@ -89,4 +95,11 @@ void ARenderTextureGL::apply() {
         glTexImage2D    ( target, 0, internal, m_Width, m_Height, 0, format, type, 0 );
     }
 
+}
+
+void ARenderTextureGL::makeCurrent(uint32_t index) const {
+    if(index == 0) {
+        glBindFramebuffer(GL_FRAMEBUFFER, m_Buffer);
+    }
+    glFramebufferTexture2D( GL_FRAMEBUFFER, (m_DepthBits) ? GL_DEPTH_ATTACHMENT : GL_COLOR_ATTACHMENT0 + index, GL_TEXTURE_2D, m_ID, 0 );
 }

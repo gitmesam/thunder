@@ -174,7 +174,7 @@
       </layout>
      </item>
      <item>
-      <widget class="PropertyEditor" name="projectSettings" native="true">
+      <widget class="PropertyEditor" name="projectSettings">
        <property name="minimumSize">
         <size>
          <width>200</width>
@@ -261,7 +261,7 @@
       </layout>
      </item>
      <item>
-      <widget class="PropertyEditor" name="propertyView" native="true">
+      <widget class="PropertyEditor" name="propertyView">
        <property name="minimumSize">
         <size>
          <width>200</width>
@@ -310,7 +310,19 @@
      <item>
       <layout class="QHBoxLayout" name="viewportLayout">
        <property name="spacing">
-        <number>0</number>
+        <number>2</number>
+       </property>
+       <property name="leftMargin">
+        <number>2</number>
+       </property>
+       <property name="topMargin">
+        <number>2</number>
+       </property>
+       <property name="rightMargin">
+        <number>2</number>
+       </property>
+       <property name="bottomMargin">
+        <number>2</number>
        </property>
        <item>
         <widget class="QPushButton" name="orthoButton">
@@ -381,6 +393,13 @@
         </widget>
        </item>
        <item>
+        <widget class="QToolButton" name="renderMode">
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <spacer name="horizontalSpacer">
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
@@ -406,6 +425,16 @@
       </widget>
      </item>
     </layout>
+   </widget>
+   <widget class="Timeline" name="timeline" native="true">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>660</y>
+      <width>411</width>
+      <height>111</height>
+     </rect>
+    </property>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menuBar">
@@ -667,7 +696,7 @@
  <customwidgets>
   <customwidget>
    <class>PropertyEditor</class>
-   <extends>QWidget</extends>
+   <extends>QTreeView</extends>
    <header>editors/propertyedit/propertyeditor.h</header>
    <container>1</container>
   </customwidget>
@@ -711,6 +740,12 @@
    <class>Viewport</class>
    <extends>QWidget</extends>
    <header>graph/viewport.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>Timeline</class>
+   <extends>QWidget</extends>
+   <header>editors/timeline/timeline.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

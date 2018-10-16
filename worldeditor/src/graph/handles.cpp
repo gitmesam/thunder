@@ -3,6 +3,7 @@
 #include <commandbuffer.h>
 #include <components/camera.h>
 #include <components/actor.h>
+#include <components/transform.h>
 
 #include <resources/material.h>
 
@@ -39,6 +40,7 @@ float conesize  = length / 5.0f;
 Mesh *Handles::s_Cone   = nullptr;
 Mesh *Handles::s_Quad   = nullptr;
 Mesh *Handles::s_Move   = nullptr;
+Mesh *Handles::s_Lines  = nullptr;
 
 MaterialInstance *Handles::s_Gizmo  = nullptr;
 MaterialInstance *Handles::s_Sprite = nullptr;
@@ -73,6 +75,10 @@ void Handles::init() {
         if(m) {
             s_Gizmo = m->createInstance();
         }
+    }
+
+    if(s_Lines == nullptr) {
+        s_Lines = Engine::objectCreate<Mesh>("Lines");
     }
 
     if(s_Move == nullptr) {
@@ -165,28 +171,48 @@ void Handles::drawArrow(const Matrix4 &transform) {
 }
 
 void Handles::drawLines(const Matrix4 &transform, const Vector3Vector &points, const Mesh::IndexVector &indices) {
-    Mesh *lines = Engine::objectCreate<Mesh>("Lines");
 
     Mesh::Lod lod;
     lod.vertices    = points;
     lod.indices     = indices;
     {
+        s_Lines->clear();
         Mesh::Surface surface;
         surface.mode    = Mesh::MODE_LINES;
         surface.lods.push_back(lod);
-        lines->addSurface(surface);
-        lines->apply();
+        s_Lines->addSurface(surface);
+        s_Lines->apply();
     }
     s_Buffer->setColor(s_Color);
-    s_Buffer->drawMesh(transform, lines, 0, ICommandBuffer::TRANSLUCENT, s_Gizmo);
+    s_Buffer->drawMesh(transform, s_Lines, 0, ICommandBuffer::TRANSLUCENT, s_Gizmo);
+}
 
-    delete lines;
+void Handles::drawAABB(AABBox &box) {
+    Vector3 min, max;
+    box.box(min, max);
+
+    Vector3Vector points = {
+        Vector3(min.x, min.y, min.z),
+        Vector3(max.x, min.y, min.z),
+        Vector3(max.x, min.y, max.z),
+        Vector3(min.x, min.y, max.z),
+
+        Vector3(min.x, max.y, min.z),
+        Vector3(max.x, max.y, min.z),
+        Vector3(max.x, max.y, max.z),
+        Vector3(min.x, max.y, max.z)
+    };
+    Mesh::IndexVector indices   = {0, 1, 1, 2, 2, 3, 3, 0,
+                                   4, 5, 5, 6, 6, 7, 7, 4,
+                                   0, 4, 1, 5, 2, 6, 3, 7};
+
+    drawLines(Matrix4(), points, indices);
 }
 
 bool Handles::drawBillboard(const Vector3 &position, const Vector2 &size, Texture *texture) {
     bool result = false;
     Matrix4 model(position, Quaternion(), Vector3(size, 1.0));
-    Matrix4 q   = model * Matrix4(Vector3(), s_ActiveCamera->actor().rotation(), Vector3(1.0));
+    Matrix4 q   = model * Matrix4(Vector3(), s_ActiveCamera->actor().transform()->rotation(), Vector3(1.0));
 
     if(HandleTools::distanceToPoint(q, Vector3()) <= sense) {
         result = true;
@@ -203,7 +229,7 @@ Vector3 Handles::moveTool(const Vector3 &position, bool locked) {
     if(s_ActiveCamera) {
         float scale = 1.0f;
         if(!s_ActiveCamera->orthographic()) {
-            scale   = (position - s_ActiveCamera->actor().position()).length() * cos(s_ActiveCamera->fov() * DEG2RAD) * 0.295f; /// \todo Magic
+            scale   = (position - s_ActiveCamera->actor().transform()->position()).length() * cos(s_ActiveCamera->fov() * DEG2RAD) * 0.295f; /// \todo Magic
         } else {
             scale  *= s_ActiveCamera->orthoWidth() * 0.04f;
         }
@@ -280,7 +306,7 @@ Vector3 Handles::moveTool(const Vector3 &position, bool locked) {
 
         Plane plane;
         plane.point     = position;
-        plane.normal    = s_ActiveCamera->actor().rotation() * Vector3(0.0, 0.0, 1.0);
+        plane.normal    = s_ActiveCamera->actor().transform()->rotation() * Vector3(0.0, 0.0, 1.0);
         if(s_Axes == AXIS_X || s_Axes == AXIS_Z) {
             plane.normal    = Vector3(0.0f, plane.normal.y, plane.normal.z);
         } else if(s_Axes == (AXIS_X | AXIS_Y)) {
@@ -288,7 +314,7 @@ Vector3 Handles::moveTool(const Vector3 &position, bool locked) {
         } else if(s_Axes == (AXIS_Z | AXIS_Y)) {
             plane.normal    = Vector3(1.0f, 0.0f, 0.0f);
         } else if(s_Axes == AXIS_Y || s_Axes == (AXIS_X | AXIS_Y | AXIS_Z)) {
-            plane.normal    = s_ActiveCamera->actor().rotation() * Vector3(0.0, 0.0, 1.0);
+            plane.normal    = s_ActiveCamera->actor().transform()->rotation() * Vector3(0.0, 0.0, 1.0);
             plane.normal    = Vector3(plane.normal.x, 0.0f, plane.normal.z);
         }
         plane.d = plane.normal.dot(plane.point);
@@ -313,18 +339,19 @@ Vector3 Handles::moveTool(const Vector3 &position, bool locked) {
 Vector3 Handles::rotationTool(const Vector3 &position, bool locked) {
     if(s_ActiveCamera) {
         float scale     = 1.0f;
+        Transform *t    = s_ActiveCamera->actor().transform();
         if(!s_ActiveCamera->orthographic()) {
-            scale   = ((position - s_ActiveCamera->actor().position()).length() * cos(s_ActiveCamera->fov() / 2 * DEG2RAD) * 0.2f);
+            scale   = ((position - t->position()).length() * cos(s_ActiveCamera->fov() / 2 * DEG2RAD) * 0.2f);
         } else {
             scale  *= s_ActiveCamera->orthoWidth() * 0.0475f; /// \todo Magic
         }
 
-        Vector3 normal  = position - s_ActiveCamera->actor().position();
+        Vector3 normal  = position - t->position();
         normal.normalize();
 
         Matrix4 model(position, Quaternion(), scale);
 
-        Matrix4 q1  = model * Matrix4(Vector3(), s_ActiveCamera->actor().rotation() * Quaternion(Vector3( 90, 0, 0)), Vector3(conesize));
+        Matrix4 q1  = model * Matrix4(Vector3(), t->rotation() * Quaternion(Vector3( 90, 0, 0)), Vector3(conesize));
         Matrix4 q2  = q1 * Matrix4(Vector3(), Quaternion(Vector3( 0, 1, 0), 180), Vector3(1));
 
         Matrix4 x   = model * Matrix4(Vector3(), Quaternion(Vector3(0, 0, 90)) *
@@ -377,7 +404,7 @@ Vector3 Handles::rotationTool(const Vector3 &position, bool locked) {
 
 Vector3 Handles::scaleTool(const Vector3 &position, bool locked) {
     if(s_ActiveCamera) {
-        Vector3 normal  = position - s_ActiveCamera->actor().position();
+        Vector3 normal  = position - s_ActiveCamera->actor().transform()->position();
         float size      = 1.0f;
         if(!s_ActiveCamera->orthographic()) {
             size    = normal.length() * cos(s_ActiveCamera->fov() / 2 * DEG2RAD) * 0.2f;

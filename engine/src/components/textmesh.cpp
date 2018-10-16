@@ -1,5 +1,6 @@
 #include "components/textmesh.h"
 #include "components/actor.h"
+#include "components/transform.h"
 
 #include "resources/mesh.h"
 
@@ -25,14 +26,14 @@ TextMesh::TextMesh() :
 
 void TextMesh::draw(ICommandBuffer &buffer, int8_t layer) {
     Actor &a    = actor();
-    if(m_pMesh && layer & (ICommandBuffer::RAYCAST | ICommandBuffer::DEFAULT | ICommandBuffer::TRANSLUCENT | ICommandBuffer::SHADOWCAST)) {
+    if(m_pMesh && layer & (ICommandBuffer::RAYCAST | ICommandBuffer::TRANSLUCENT)) {
         if(layer & ICommandBuffer::RAYCAST) {
             buffer.setColor(ICommandBuffer::idToColor(a.uuid()));
         }
 
         for(uint32_t s = 0; s < m_pMesh->surfacesCount(); s++) {
             MaterialInstance *material   = (s < m_Materials.size()) ? m_Materials[s] : nullptr;
-            buffer.drawMesh(a.worldTransform(), m_pMesh, s, layer, material);
+            buffer.drawMesh(a.transform()->worldTransform(), m_pMesh, s, layer, material);
         }
         buffer.setColor(Vector4(1.0f));
     }
@@ -134,11 +135,11 @@ void TextMesh::setFont(Font *font) {
     composeMesh();
 }
 
-int TextMesh::size() const {
+int TextMesh::fontSize() const {
     return m_Size;
 }
 
-void TextMesh::setSize(int size) {
+void TextMesh::setFontSize(int size) {
     m_Size  = size;
     composeMesh();
 }

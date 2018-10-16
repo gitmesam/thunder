@@ -20,7 +20,7 @@ void ObjectHierarchyModel::setRoot(Object *scene) {
 
 Object *ObjectHierarchyModel::findObject(const QString &ref) {
     QUrl path(ref);
-    return m_rootItem->find(path.path().toStdString()); // \todo Review need to check this on errors
+    return m_rootItem->find(path.path().toStdString()); /// \todo Review need to check this on errors
 }
 
 void ObjectHierarchyModel::reset() {
@@ -128,8 +128,11 @@ QModelIndex ObjectHierarchyModel::parent(const QModelIndex &index) const {
         return QModelIndex();
     }
     QList<Object *> list;
-    for(auto it : parentItem->parent()->getChildren()) {
-        list.push_back(it);
+    Object *p   = parentItem->parent();
+    if(p) {
+        for(auto it : p->getChildren()) {
+            list.push_back(it);
+        }
     }
     return createIndex(list.indexOf(parentItem), 0, parentItem);
 }

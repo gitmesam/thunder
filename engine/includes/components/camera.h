@@ -5,8 +5,10 @@
 
 #include "nativebehaviour.h"
 
-class NEXT_LIBRARY_EXPORT Camera : public NativeBehaviour {
-    A_REGISTER(Camera, NativeBehaviour, Components);
+class Pipeline;
+
+class NEXT_LIBRARY_EXPORT Camera : public Component {
+    A_REGISTER(Camera, Component, Components);
 
     A_PROPERTIES(
         A_PROPERTY(float, Fov,  Camera::fov, Camera::setFov),
@@ -21,7 +23,11 @@ class NEXT_LIBRARY_EXPORT Camera : public NativeBehaviour {
 public:
     Camera                      ();
 
+    Pipeline                   *pipeline                ();
+
     void                        matrices                (Matrix4 &v, Matrix4 &p) const;
+
+    Matrix4                     projectionMatrix        () const;
 
     static bool                 project                 (const Vector3 &ws, const Matrix4 &modelview, const Matrix4 &projection, Vector3 &ss);
     static bool                 unproject               (const Vector3 &ss, const Matrix4 &modelview, const Matrix4 &projection, Vector3 &ws);
@@ -54,6 +60,9 @@ public:
 
     array<Vector3, 8>           frustumCorners          (float nearPlane, float farPlane) const;
 
+    static Camera              *current                 ();
+    static void                 setCurrent              (Camera *current);
+
 protected:
     bool                        m_Ortho;
 
@@ -70,6 +79,10 @@ protected:
     float                       m_OrthoWidth;
 
     Vector4                     m_Color;
+
+    Pipeline                   *m_pPipeline;
+
+    static Camera              *s_pCurrent;
 };
 
 #endif // CAMERA_H

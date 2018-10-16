@@ -19,7 +19,6 @@ using namespace std;
 
 class NEXT_LIBRARY_EXPORT MetaType {
 public:
-    /*! \enum Type */
     enum Type {
         INVALID                 = 0,
         BOOLEAN,

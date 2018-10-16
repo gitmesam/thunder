@@ -43,19 +43,19 @@ void AMaterialGL::loadUserData(const VariantMap &data) {
     switch(m_MaterialType) {
         case PostProcess: {
             m_DoubleSided   = true;
-            m_Tangent       = false;
             m_BlendMode     = Opaque;
             m_LightModel    = Unlit;
             m_Surfaces      = Static;
+            m_DepthTest     = false;
 
             m_Programs[0]    = buildShader(Fragment, gEmbedded + gPost);
         } break;
         case LightFunction: {
             m_DoubleSided   = true;
-            m_Tangent       = false;
             m_BlendMode     = Opaque;
             m_LightModel    = Unlit;
             m_Surfaces      = Static;
+            m_DepthTest     = false;
 
             /// \todo should be removed
             setTexture("normalsMap",    nullptr);
@@ -91,9 +91,6 @@ void AMaterialGL::loadUserData(const VariantMap &data) {
                     define += "\n#define MODEL_UNLIT 1";
                 } break;
             }
-            if(m_Tangent) {
-                define += "\n#define TANGENT 1";
-            }
 
             m_Programs[0]       = buildShader(Fragment, gEmbedded + gSurface, define);
             define += "\n#define SIMPLE 1";
@@ -112,10 +109,10 @@ uint32_t AMaterialGL::getProgram(uint16_t type) const {
     return 0;
 }
 
-uint32_t AMaterialGL::bind(ICommandBuffer &buffer, MaterialInstance *instance, uint8_t layer) {
-    uint8_t b   = blendMode();
+uint32_t AMaterialGL::bind(uint8_t layer) {
+    int32_t b   = blendMode();
 
-    if((layer & ICommandBuffer::DEFAULT || layer & ICommandBuffer::SHADOWCAST) && //  || layer & ICommandBuffer::RAYCAST
+    if((layer & ICommandBuffer::DEFAULT || layer & ICommandBuffer::SHADOWCAST) &&
        (b == Material::Additive || b == Material::Translucent)) {
         return 0;
     }
@@ -138,10 +135,11 @@ uint32_t AMaterialGL::bind(ICommandBuffer &buffer, MaterialInstance *instance, u
         return 0;
     }
 
-    if(m_DepthTest) {
-        glEnable(GL_DEPTH_TEST);
-    } else {
+    if(!m_DepthTest/* || layer & ICommandBuffer::RAYCAST*/) {
         glDisable(GL_DEPTH_TEST);
+    } else {
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc((layer & ICommandBuffer::DEFAULT) ? GL_EQUAL : GL_LEQUAL);
     }
 
     if(!isDoubleSided() && !(layer & ICommandBuffer::RAYCAST)) {
@@ -177,7 +175,7 @@ void AMaterialGL::unbind(uint8_t) {
 
     glUseProgram(0);
 
-    uint8_t blend   = blendMode();
+    int32_t blend   = blendMode();
     if(blend == Material::Additive || blend == Material::Translucent) {
         glDisable   ( GL_BLEND );
     }
@@ -264,9 +262,9 @@ bool AMaterialGL::checkShader(uint32_t shader, const string &path, bool link) {
         if(value) {
             char *buff  = new char[value + 1];
             if(!link) {
-                glGetShaderInfoLog(shader, value, NULL, buff);
+                glGetShaderInfoLog(shader, value, nullptr, buff);
             } else {
-                glGetProgramInfoLog(shader, value, NULL, buff);
+                glGetProgramInfoLog(shader, value, nullptr, buff);
             }
             Log(Log::ERR) << "[ Render::ShaderGL ]" << path.c_str() << "\n[ Said ]" << buff;
             delete []buff;

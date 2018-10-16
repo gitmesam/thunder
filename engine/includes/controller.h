@@ -10,7 +10,7 @@
 class Camera;
 class Scene;
 
-class NEXT_LIBRARY_EXPORT IController {
+class NEXT_LIBRARY_EXPORT [[deprecated("To be removed in 2018.4")]] IController {
 public:
     IController                 ();
 
@@ -26,7 +26,7 @@ public:
 */
     virtual void                selectGeometry              (Vector2 &, Vector2 &);
 
-    virtual void                setSelectedObjects          (list<uint32_t> &);
+    virtual void                setSelectedObjects          (const list<uint32_t> &);
 
 protected:
     Camera                     *m_pActiveCamera;

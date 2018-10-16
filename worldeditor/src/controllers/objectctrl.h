@@ -18,6 +18,7 @@
 class Engine;
 class Actor;
 class Scene;
+class Texture;
 
 class ObjectCtrl : public CameraCtrl {
     Q_OBJECT
@@ -61,10 +62,12 @@ public:
 public slots:
     void                onInputEvent                (QInputEvent *);
 
-    void                onComponentSelected         (const QString &path);
+    void                onCreateSelected            (const QString &name);
+    void                onDeleteComponent           (const QString &name);
 
     void                onDrop                      ();
     void                onDragEnter                 (QDragEnterEvent *);
+    void                onDragMove                  (QDragMoveEvent *);
     void                onDragLeave                 (QDragLeaveEvent *);
 
     void                onSelectActor               (Object::ObjectList list, bool undo = true);
@@ -82,6 +85,8 @@ signals:
 
     void                objectsUpdated              ();
 
+    void                objectsChanged              (Object::ObjectList objects, const QString &property);
+
     void                objectsSelected             (Object::ObjectList objects);
 
     void                loadMap                     (const QString &map);
@@ -89,7 +94,7 @@ signals:
 protected:
     void                drawHelpers                 (Object &object);
 
-    void                selectGeometry              (Vector2 &, Vector2 &);
+    void                selectGeometry              (Vector2 &, Vector2 &size);
 
     Vector3             objectPosition              ();
 
@@ -119,6 +124,9 @@ protected:
 
     Object             *m_pMap;
 
+    Texture            *m_pDepth;
+    Texture            *m_pSelect;
+
     Object::ObjectList  m_DragObjects;
 
     QString             m_DragMap;
@@ -129,6 +137,8 @@ protected:
     Vector3             mWorld;
     Vector3             mSaved;
     Vector3             mPosition;
+
+    Vector3             mMouseWorld;
 
     UndoManager::PropertyObjects   *m_pPropertyState;
 };

@@ -7,6 +7,7 @@
 
 #include <engine.h>
 #include <components/actor.h>
+#include <components/transform.h>
 #include <components/staticmesh.h>
 #include <components/directlight.h>
 #include <components/camera.h>
@@ -90,7 +91,7 @@ MaterialEdit::~MaterialEdit() {
 }
 
 void MaterialEdit::timerEvent(QTimerEvent *) {
-    glWidget->update();
+    glWidget->repaint();
 }
 
 void MaterialEdit::readSettings() {
@@ -181,7 +182,7 @@ void MaterialEdit::onGLInit() {
     m_pLight    = Engine::objectCreate<Actor>("LightSource", scene);
     Matrix3 rot;
     rot.rotate(Vector3(-45.0f, 45.0f, 0.0f));
-    m_pLight->setRotation(rot);
+    m_pLight->transform()->setRotation(rot);
     m_pLight->addComponent<DirectLight>();
 
     CameraCtrl *controller  = static_cast<CameraCtrl *>(glWidget->controller());

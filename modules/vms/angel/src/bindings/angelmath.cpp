@@ -176,6 +176,11 @@ void registerVector4(asIScriptEngine *engine) {
     engine->RegisterObjectMethod("Vector4", "float dot(const Vector4 &in)", asMETHOD(Vector4, dot), asCALL_THISCALL);
 }
 
+void registerColor(asIScriptEngine *engine) {
+    engine->RegisterObjectType("Color", sizeof(Vector4), asOBJ_VALUE | asOBJ_APP_CLASS_CDAK);
+    engine->RegisterObjectBehaviour("Color", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(vec4), asCALL_CDECL_OBJLAST);
+}
+
 static void mat3(Matrix3 *dest) {
     new (dest) Matrix3();
 }
@@ -444,6 +449,8 @@ void registerMath(asIScriptEngine *engine) {
     registerVector2(engine);
     registerVector3(engine);
     registerVector4(engine);
+
+    registerColor(engine);
 
     registerMatrix3(engine);
     registerMatrix4(engine);

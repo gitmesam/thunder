@@ -3,6 +3,10 @@
 #include <system.h>
 #include <commandbuffer.h>
 
+#include <components/camera.h>
+
+#include <resources/pipeline.h>
+
 #include "handles.h"
 #include "controllers/objectctrl.h"
 
@@ -18,13 +22,21 @@ Viewport::Viewport(QWidget *parent) :
     setAcceptDrops(true);
     //setContextMenuPolicy(Qt::CustomContextMenu);
     setAutoFillBackground(false);
+}
 
+void Viewport::onSetMode() {
+    if(m_Target.empty()) {
+        m_Target    = "depthMap";
+    } else {
+        m_Target.clear();
+    }
 }
 
 void Viewport::initializeGL() {
     if(m_pController) {
         static_cast<CameraCtrl *>(m_pController)->init(m_pScene);
     }
+
     SceneView::initializeGL();
 
     m_Systems.push_back(PluginModel::instance()->createSystem("AngelScript"));
@@ -41,6 +53,17 @@ void Viewport::paintGL() {
 
     if(m_pController) {
         Handles::s_ActiveCamera = m_pController->activeCamera();
+
+        if(!m_Target.empty()) {
+            Pipeline *pipeline  = Handles::s_ActiveCamera->pipeline();
+
+            MaterialInstance *sprite    = pipeline->sprite();
+            sprite->setTexture("texture0", reinterpret_cast<const Texture *>(pipeline->target(m_Target)));
+
+            m_pCommandBuffer->setScreenProjection();
+            m_pCommandBuffer->drawMesh(Matrix4(), pipeline->plane(), 0, ICommandBuffer::UI, sprite);
+        }
+
         Handles::beginDraw(m_pCommandBuffer);
         static_cast<CameraCtrl *>(m_pController)->drawHandles();
         Handles::endDraw();
@@ -57,6 +80,10 @@ void Viewport::resizeGL(int width, int height) {
 
 void Viewport::dragEnterEvent(QDragEnterEvent *event) {
     emit dragEnter(event);
+}
+
+void Viewport::dragMoveEvent(QDragMoveEvent *event) {
+    emit dragMove(event);
 }
 
 void Viewport::dragLeaveEvent(QDragLeaveEvent *event) {

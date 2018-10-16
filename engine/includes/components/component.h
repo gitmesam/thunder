@@ -17,14 +17,25 @@ class NEXT_LIBRARY_EXPORT Component : public Object {
 public:
     Component                   ();
 
+    virtual void                draw                    (ICommandBuffer &buffer, int8_t layer);
+
     Actor                      &actor                   () const;
 
     bool                        isEnable                () const;
 
     void                        setEnable               (bool enable);
 
+    bool                        isStarted               () const;
+
+    void                        setStarted              (bool started);
+
+protected:
+    bool                        isSerializable          () const;
+
 protected:
     bool                        m_Enable;
+
+    bool                        m_Started;
 
 };
 

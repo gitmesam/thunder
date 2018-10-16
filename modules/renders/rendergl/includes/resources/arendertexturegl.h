@@ -9,6 +9,8 @@ class ARenderTextureGL : public RenderTexture {
     A_OVERRIDE(ARenderTextureGL, RenderTexture, Resources)
 
 public:
+     ARenderTextureGL           ();
+
     ~ARenderTextureGL           ();
 
     void                        apply                       ();
@@ -18,6 +20,8 @@ public:
     uint32_t                    buffer                      () const { return m_Buffer; }
 
     void                       *nativeHandle                () const { return (void *)m_ID; }
+
+    void                        makeCurrent                 (uint32_t index = 0) const;
 
 private:
     uint32_t                    m_Buffer;

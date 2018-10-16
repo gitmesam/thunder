@@ -35,7 +35,7 @@ matrix:
         - sudo apt-get -y install qt510base qt510multimedia qt510script qt510svg qt510imageformats qt510tools binutils zlib1g-dev xorg-dev gcc-7 g++-7
         - source /opt/qt510/bin/qt510-env.sh
         - wget https://github.com/eprikazchikov/dependencies/releases/download/qbs-1.11.0/qbs-1.11.0-linux.tar.gz
-        - tar -xvzf qbs-1.11.0-linux.tar.gz
+        - tar -xvzf qbs-1.11.0-linux.tar.gz > /dev/null
         - export PATH=$PATH:qbs-build/bin
         - qbs --version
         - qbs setup-toolchains --detect
@@ -45,6 +45,12 @@ matrix:
         - qbs config --list
         - qbs install --all-products config:release
         - tar -zcvf ThunderEngine-linux-x86_64.tar.gz release/install-root/sdk/${VERSION}/linux
+      deploy:
+        - provider: script
+          skip_cleanup: true
+          script: curl --upload-file ThunderEngine-linux-x86_64.tar.gz https://transfer.sh/ThunderEngine-${BUILD}-linux-x86_64.tar.gz
+          on:
+            tags: true
       
     - language: cpp
       os: osx
@@ -66,11 +72,22 @@ matrix:
         - qbs resolve config:release profile:xcode-appletvos-arm64
         - qbs install --all-products config:release profile:xcode-appletvos-arm64
         - tar -zcvf ThunderEngine-tvos-arm64.tar.gz release/install-root/sdk/${VERSION}/tvos
-      after_success:
-        - ls
-        - curl -v --ftp-create-dirs -T ThunderEngine-macosx-x86_64.tar.gz -u $FTP_USER:$FTP_PASSWORD ftp://ftp.thunderengine.ru/ThunderEngine-${BUILD}-macos-x86_64.tar.gz
-        - curl -v --ftp-create-dirs -T ThunderEngine-ios-arm64.tar.gz -u $FTP_USER:$FTP_PASSWORD ftp://ftp.thunderengine.ru/ThunderEngine-${BUILD}-ios-arm64.tar.gz
-        - curl -v --ftp-create-dirs -T ThunderEngine-tvos-arm64.tar.gz -u $FTP_USER:$FTP_PASSWORD ftp://ftp.thunderengine.ru/ThunderEngine-${BUILD}-tvos-arm64.tar.gz
+      deploy:
+        - provider: script
+          skip_cleanup: true
+          script: curl --upload-file ThunderEngine-macosx-x86_64.tar.gz https://transfer.sh/ThunderEngine-${BUILD}-macos-x86_64.tar.gz
+          on:
+            tags: true
+        - provider: script
+          skip_cleanup: true
+          script: curl --upload-file ThunderEngine-ios-arm64.tar.gz https://transfer.sh/ThunderEngine-${BUILD}-ios-arm64.tar.gz
+          on:
+            tags: true
+        - provider: script
+          skip_cleanup: true
+          script: curl --upload-file ThunderEngine-tvos-arm64.tar.gz https://transfer.sh/ThunderEngine-${BUILD}-tvos-arm64.tar.gz
+          on:
+            tags: true
         
 #    - lanuage: android
 #      os: linux

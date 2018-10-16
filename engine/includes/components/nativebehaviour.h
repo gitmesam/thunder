@@ -16,8 +16,6 @@ public:
 
     virtual void                update                  ();
 
-    virtual void                draw                    (ICommandBuffer &buffer, int8_t layer);
-
 };
 
 #endif // NATIVEBEHAVIOUR_H

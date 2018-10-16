@@ -18,15 +18,17 @@
 #include "timer.h"
 #include "input.h"
 
-#include "components/chunk.h"
 #include "components/scene.h"
 #include "components/actor.h"
+#include "components/transform.h"
 #include "components/camera.h"
 #include "components/staticmesh.h"
 #include "components/directlight.h"
 #include "components/textmesh.h"
 
 #include "components/spritemesh.h"
+
+#include "components/animationcontroller.h"
 
 #include "analytics/profiler.h"
 #if THUNDER_MOBILE
@@ -40,6 +42,8 @@
 #include "resources/material.h"
 #include "resources/mesh.h"
 #include "resources/font.h"
+#include "resources/animationclip.h"
+#include "resources/pipeline.h"
 
 #include "log.h"
 
@@ -61,6 +65,8 @@ public:
         m_Valid(false) {
 
     }
+
+    Scene                       *m_pScene;
 
     list<ISystem *>             m_Systems;
 
@@ -119,7 +125,7 @@ Engine::Engine(IFile *file, int, char **argv) :
     p_ptr->m_Controller = new IController();
 
     REGISTER_META_TYPE_IMPL(MaterialArray);
-    REGISTER_META_TYPE_IMPL(Color);
+    //REGISTER_META_TYPE_IMPL(Color);
 
     Text::registerClassFactory(this);
     Texture::registerClassFactory(this);
@@ -127,10 +133,11 @@ Engine::Engine(IFile *file, int, char **argv) :
     Mesh::registerClassFactory(this);
     Atlas::registerClassFactory(this);
     Font::registerClassFactory(this);
+    AnimationClip::registerClassFactory(this);
 
     Scene::registerClassFactory(this);
-    Chunk::registerClassFactory(this);
     Actor::registerClassFactory(this);
+    Transform::registerClassFactory(this);
     Camera::registerClassFactory(this);
 
     StaticMesh::registerClassFactory(this);
@@ -138,6 +145,12 @@ Engine::Engine(IFile *file, int, char **argv) :
     SpriteMesh::registerClassFactory(this);
     DirectLight::registerClassFactory(this);
     RenderTexture::registerClassFactory(this);
+
+    AnimationController::registerClassFactory(this);
+
+    Pipeline::registerClassFactory(this);
+
+    p_ptr->m_pScene = Engine::objectCreate<Scene>("Scene");
 }
 
 Engine::~Engine() {
@@ -174,34 +187,29 @@ int32_t Engine::exec() {
         }
     }
 
-    Scene *scene   = Engine::objectCreate<Scene>();
-    if(scene) {
+
+    if(p_ptr->m_pScene) {
         p_ptr->m_Valid  = true;
 
         string path     = value(gEntry, "").toString();
-        Chunk *level    = loadResource<Chunk>(path);
+        Actor *level    = loadResource<Actor>(path);
         Log(Log::DBG) << "Level:" << path.c_str() << "loading...";
         if(level) {
-            level->setParent(scene);
+            level->setParent(p_ptr->m_pScene);
         }
 
-        Camera *component   = scene->findChild<Camera *>();
+        Camera *component   = p_ptr->m_pScene->findChild<Camera *>();
         if(component == nullptr) {
             Log(Log::DBG) << "Camera not found creating new one.";
-            Actor *camera   = Engine::objectCreate<Actor>("ActiveCamera", scene);
-            camera->setPosition(Vector3(0.0f));
+            Actor *camera   = Engine::objectCreate<Actor>("ActiveCamera", p_ptr->m_pScene);
+            camera->transform()->setPosition(Vector3(0.0f));
             component       = camera->addComponent<Camera>();
         }
-        for(auto it : p_ptr->m_Systems) {
-            Log(Log::DBG) << "Resize for" << it->name();
-            it->resize(p_ptr->m_pPlatform->screenWidth(), p_ptr->m_pPlatform->screenHeight());
-        }
+        component->pipeline()->resize(p_ptr->m_pPlatform->screenWidth(), p_ptr->m_pPlatform->screenHeight());
         component->setRatio(float(p_ptr->m_pPlatform->screenWidth()) / float(p_ptr->m_pPlatform->screenHeight()));
 
         p_ptr->m_Controller->setActiveCamera(component);
-        // Start Scene
-        scene->start();
-
+        Camera::setCurrent(component);
         // Enter to game loop
         while(p_ptr->m_Valid) {
             Timer::update();
@@ -209,18 +217,18 @@ int32_t Engine::exec() {
             while(lag >= Timer::fixedDelta()) {
                 // fixed update
                 p_ptr->m_Controller->update();
-                scene->update();
+                updateScene(p_ptr->m_pScene);
 
-                for(auto it : p_ptr->m_Systems) {
-                    it->update(*scene);
-                }
                 lag -= Timer::fixedDelta();
+            }
+            for(auto it : p_ptr->m_Systems) {
+                it->update(*(p_ptr->m_pScene));
             }
             p_ptr->m_Valid  = p_ptr->m_pPlatform->isValid();
             p_ptr->m_pPlatform->update();
         }
         p_ptr->m_pPlatform->stop();
-        delete scene;
+        delete p_ptr->m_pScene;
     }
     return 0;
 }
@@ -272,8 +280,7 @@ Object *Engine::loadResource(const string &path) {
                     if(var.isValid()) {
                         Object *res = Engine::toObject(var);
                         if(res) {
-                            EnginePrivate::m_ResourceCache[uuid]    = res;
-                            EnginePrivate::m_ReferenceCache[res]    = uuid;
+                            setResource(res, uuid);
                             return res;
                         }
                     }
@@ -282,6 +289,11 @@ Object *Engine::loadResource(const string &path) {
         }
     }
     return nullptr;
+}
+
+void Engine::setResource(Object *object, string &uuid) {
+    EnginePrivate::m_ResourceCache[uuid]    = object;
+    EnginePrivate::m_ReferenceCache[object] = uuid;
 }
 
 string Engine::reference(Object *object) {
@@ -339,6 +351,10 @@ IController *Engine::controller() {
     return p_ptr->m_Controller;
 }
 
+Scene *Engine::scene() {
+    return p_ptr->m_pScene;
+}
+
 IFile *Engine::file() {
     PROFILER_MARKER;
 
@@ -378,4 +394,22 @@ string Engine::organizationName() const {
 
 void Engine::setOrganizationName(const string &name) {
     EnginePrivate::m_Organization   = name;
+}
+
+void Engine::updateScene(Object *object) {
+    if(object) {
+        for(auto &it : object->getChildren()) {
+            Object *child   = it;
+            NativeBehaviour *comp = dynamic_cast<NativeBehaviour *>(child);
+            if(comp && comp->isEnable()) {
+                if(!comp->isStarted()) {
+                    comp->start();
+                    comp->setStarted(true);
+                }
+                comp->update();
+            } else {
+                updateScene(child);
+            }
+        }
+    }
 }

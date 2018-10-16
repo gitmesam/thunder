@@ -29,7 +29,7 @@ layout(location = 3) out vec4 gbuffer4;
 
 void simpleMode(Params params) {
     float alpha = getOpacity ( params );
-    if(_clip >= alpha) {
+    if(alpha <= _clip) {
         discard;
     }
     gbuffer1    = t_color;
@@ -77,10 +77,8 @@ void main(void) {
     params.reflect  = vec3(0.0);
     params.color    = _color;
     params.normal   = _n;
-#ifdef TANGENT
     params.normal   = 2.0 * getNormal( params ) - vec3( 1.0 );
     params.normal   = normalize( params.normal.x * _t + params.normal.y * _b + params.normal.z * _n );
-#endif
     params.reflect  = reflect( _view, params.normal );
 #ifdef SIMPLE
     #ifdef DEPTH

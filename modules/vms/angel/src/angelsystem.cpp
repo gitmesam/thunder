@@ -221,8 +221,20 @@ void AngelSystem::registerClasses(asIScriptEngine *engine) {
                     MetaType type   = property.type();
                     string name =  type.name();
 
-                    string get  = name + " &get_" + property.name() + "()";
-                    string set  = string("void set_") + property.name() + "(" + name + ((MetaType::type(type.name()) < MetaType::STRING) ? "" : " &in") + ")";
+                    bool ptr    = false;
+                    for(auto &it : name) {
+                        if(it == '*') {
+                            it = '&';
+                        }
+                        if(it == '&') {
+                            ptr = true;
+                        }
+                    }
+
+                    string ref  = (ptr) ? "" : " &";
+
+                    string get  = name + ref +"get_" + property.name() + "()";
+                    string set  = string("void set_") + property.name() + "(" + name + ((MetaType::type(type.name()) < MetaType::STRING) ? "" : (ref + ((ptr) ? "" : "in"))) + ")";
 
                     asSFuncPtr ptr1(3);
                     property.table()->readmem(ptr1.ptr.dummy, sizeof(void *));

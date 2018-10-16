@@ -8,12 +8,15 @@
 #include "object.h"
 #include <objectsystem.h>
 
-class IFile;
+#include <file.h>
 
 class IModule;
 class IController;
 
 class EnginePrivate;
+
+class Actor;
+class Scene;
 
 class NEXT_LIBRARY_EXPORT Engine : public ObjectSystem {
 public:
@@ -53,6 +56,8 @@ public:
 
     IController                *controller                  ();
 
+    Scene                      *scene                       ();
+
     static IFile               *file                        ();
 
     static string               locationAppDir              ();
@@ -68,6 +73,10 @@ public:
     string                      organizationName            () const;
 
     void                        setOrganizationName         (const string &name);
+
+    static void                 updateScene                 (Object *object);
+
+    static void                 setResource                 (Object *object, string &uuid);
 
 private:
     EnginePrivate              *p_ptr;
