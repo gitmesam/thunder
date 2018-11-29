@@ -36,6 +36,8 @@ Project {
         "../thirdparty/zlib/src",
         "../thirdparty/libogg/src",
         "../thirdparty/libvorbis/src",
+        "../thirdparty/glsl",
+        "../thirdparty/spirvcross/src"
     ]
 
     QtGuiApplication {
@@ -50,6 +52,8 @@ Project {
         Depends { name: "ogg-editor" }
         Depends { name: "engine-editor" }
         Depends { name: "rendergl-editor" }
+        Depends { name: "glsl" }
+        Depends { name: "spirvcross" }
         Depends { name: "Qt"; submodules: ["core", "gui", "widgets", "multimedia"]; }
 
         property bool isBundle: qbs.targetOS.contains("darwin") && bundle.isBundle

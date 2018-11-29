@@ -176,6 +176,10 @@ private:
 
     void                        cleanup                     ();
 
+    void                        addPragma                   (const string &key, const string &value);
+    string                      parseData                   (const string &data, const string &define);
+    string                      loadIncludes                (const string &path, const string &define);
+
     typedef map<QString, uint8_t>   UniformMap;
 
     typedef QPair<QString, bool>    TexturePair;
@@ -204,6 +208,10 @@ private:
     bool                        m_DepthTest;
 
     AbstractSchemeModel::Node  *m_pNode;
+
+    typedef map<string, string> PragmaMap;
+
+    PragmaMap                   m_Pragmas;
 };
 
 #endif // SHADERBUILDER_H

@@ -3,7 +3,6 @@
 #pragma flags
 
 #include ".embedded/Common.vert"
-#include ".embedded/BRDF.frag"
 
 layout(location = 0) in vec3 _vertex;
 layout(location = 1) in vec2 _uv0;

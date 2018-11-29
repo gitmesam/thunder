@@ -31,6 +31,11 @@
 #include "projectmanager.h"
 
 #include "functionmodel.h"
+#include "spirvconverter.h"
+#include "resources/text.h"
+
+#include <regex>
+#include <sstream>
 
 #define NODES       "Nodes"
 #define LINKS       "Links"
@@ -46,6 +51,9 @@
 #define DEPTH       "Depth"
 #define X           "X"
 #define Y           "Y"
+
+const regex include("^[ ]*#[ ]*include[ ]+[\"<](.*)[\">][^?]*");
+const regex pragma("^[ ]*#[ ]*pragma[ ]+(.*)[^?]*");
 
 ShaderBuilder::ShaderBuilder() :
         m_DoubleSided(false),
@@ -404,8 +412,6 @@ void ShaderBuilder::save(const QString &path) {
 
 bool ShaderBuilder::build() {
     cleanup();
-
-    m_Shader.clear();
     // Nodes
     QString str;
     buildRoot(str);
@@ -434,6 +440,16 @@ bool ShaderBuilder::build() {
     }
     m_Shader.append("\n");
     m_Shader.append(str);
+
+    addPragma("version", "#version 430 core");
+    addPragma("material", m_Shader.toStdString());
+
+    string buff = loadIncludes(".embedded/Surface.frag", "");
+    vector<uint32_t> spv = SpirVConverter::glslToSpv(buff);
+    if(!spv.empty()) {
+        qDebug() << SpirVConverter::spvToGlsl(spv).c_str();
+    }
+
     return true;
 }
 
@@ -475,7 +491,7 @@ Variant ShaderBuilder::data() const {
     }
     user["Textures"]    = textures;
     user["Properties"]  = properties;
-    user["Shader"]      = shader().toStdString();
+    user["Shader"]      = m_Shader.toStdString();
 
     return user;
 }
@@ -553,4 +569,45 @@ void ShaderBuilder::cleanup() {
     m_Textures.clear();
     m_Params.clear();
     m_Uniforms.clear();
+    m_Pragmas.clear();
+    m_Shader.clear();
+}
+
+void ShaderBuilder::addPragma(const string &key, const string &value) {
+    m_Pragmas[key]  = m_Pragmas[key].append(value).append("\r\n");
+}
+
+string ShaderBuilder::parseData(const string &data, const string &define) {
+    stringstream input;
+    stringstream output;
+    input << data;
+
+    string line;
+    while( getline(input, line) ) {
+        smatch matches;
+        if(regex_match(line, matches, include)) {
+            output << loadIncludes(string(matches[1]), define) << endl;
+        } else if(regex_match(line, matches, pragma)) {
+            if(matches[1] == "flags") {
+                output << define << endl;
+            } else {
+                auto it = m_Pragmas.find(matches[1]);
+                if(it != m_Pragmas.end()) {
+                    output << m_Pragmas[matches[1]] << endl;
+                }
+            }
+        } else {
+            output << line << endl;
+        }
+    }
+    return output.str();
+}
+
+string ShaderBuilder::loadIncludes(const string &path, const string &define) {
+    Text *text  = Engine::loadResource<Text>(path);
+    if(text) {
+        return parseData(text->text(), define);
+    }
+
+    return string();
 }
