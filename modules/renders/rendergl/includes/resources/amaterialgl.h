@@ -42,16 +42,16 @@ public:
 
     uint32_t                    getProgram      (uint16_t type) const;
 
-    uint32_t                    buildShader     (uint8_t type, const string &path = string(), const string &define = string());
+    uint32_t                    buildShader     (uint8_t type, const string &src = string());
 
     TextureMap                  textures        () const { return m_Textures; }
+
+    string                      loadIncludes    (const string &path, const string &define = string());
 
 protected:
     void                        addPragma       (const string &key, const string &value);
 
     string                      parseData       (const string &data, const string &define);
-
-    string                      loadIncludes    (const string &path, const string &define = string());
 
     bool                        checkShader     (uint32_t shader, const string &path, bool link = false);
 

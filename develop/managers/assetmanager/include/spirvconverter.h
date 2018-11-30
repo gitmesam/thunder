@@ -133,8 +133,8 @@ public:
         const char *str = buff.c_str();
         shader.setStrings(&str, 1);
 
-        vector<string> Processes;
-        shader.addProcesses(Processes);
+        vector<string> processes;
+        shader.addProcesses(processes);
 
         vector<string> base;
         shader.setResourceSetBinding(base);

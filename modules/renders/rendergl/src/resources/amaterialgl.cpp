@@ -48,7 +48,7 @@ void AMaterialGL::loadUserData(const VariantMap &data) {
             m_Surfaces      = Static;
             m_DepthTest     = false;
 
-            m_Programs[0]    = buildShader(Fragment, gEmbedded + gPost);
+            m_Programs[0]    = buildShader(Fragment, loadIncludes(gEmbedded + gPost));
         } break;
         case LightFunction: {
             m_DoubleSided   = true;
@@ -65,7 +65,7 @@ void AMaterialGL::loadUserData(const VariantMap &data) {
             setTexture("depthMap",      nullptr);
             setTexture("shadowMap",     nullptr);
 
-            m_Programs[0]    = buildShader(Fragment, gEmbedded + gLight);
+            m_Programs[0]    = buildShader(Fragment, loadIncludes(gEmbedded + gLight));
         } break;
         default: { // Surface type
             string define;
@@ -92,11 +92,11 @@ void AMaterialGL::loadUserData(const VariantMap &data) {
                 } break;
             }
 
-            m_Programs[0]       = buildShader(Fragment, gEmbedded + gSurface, define);
+            m_Programs[0]       = buildShader(Fragment, (*it).second.toString());
             define += "\n#define SIMPLE 1";
-            m_Programs[Simple]  = buildShader(Fragment, gEmbedded + gSurface, define);
+            m_Programs[Simple]  = buildShader(Fragment, loadIncludes(gEmbedded + gSurface, define));
             define += "\n#define DEPTH 1";
-            m_Programs[Depth]   = buildShader(Fragment, gEmbedded + gSurface, define);
+            m_Programs[Depth]   = buildShader(Fragment, loadIncludes(gEmbedded + gSurface, define));
         } break;
     }
 }
@@ -164,7 +164,7 @@ void AMaterialGL::unbind(uint8_t) {
     uint8_t t   = 0;
     for(auto it : m_Textures) {
         glActiveTexture(GL_TEXTURE0 + t);
-        const Texture *texture    = it.second;
+        const Texture *texture  = it.second;
         if(texture) {
             glBindTexture((texture->isCubemap()) ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, 0);
         }
@@ -186,35 +186,30 @@ void AMaterialGL::clear() {
     Material::clear();
 
     m_Pragmas.clear();
-#ifndef THUNDER_MOBILE
+
     addPragma("version", "#version 430 core");
-#else
-    addPragma("version", "#version 300 es");
-#endif
+
     for(auto it : m_Programs) {
         glDeleteProgram(it.second);
     }
     m_Programs.clear();
 }
 
-uint32_t AMaterialGL::buildShader(uint8_t type, const string &path, const string &define) {
+uint32_t AMaterialGL::buildShader(uint8_t type, const string &src) {
     uint32_t result = 0;
+
+    const char *data    = src.c_str();
 
     uint32_t t;
     switch(type) {
-#ifndef THUNDER_MOBILE
-        case Geometry:  t   = GL_GEOMETRY_SHADER; break;
-#endif
-        case Vertex:    t   = GL_VERTEX_SHADER;   break;
-        default:        t   = GL_FRAGMENT_SHADER; break;
+        case Vertex: t  = GL_VERTEX_SHADER;   break;
+        default:     t  = GL_FRAGMENT_SHADER; break;
     }
-    string src  = loadIncludes(path, define);
-    const char *data    = src.c_str();
 
     uint32_t shader = glCreateShader(t);
     glShaderSource(shader, 1, &data, nullptr);
     glCompileShader(shader);
-    checkShader(shader, path);
+    //checkShader(shader, path);
 
     result = glCreateProgram();
     if (result) {
@@ -226,7 +221,7 @@ uint32_t AMaterialGL::buildShader(uint8_t type, const string &path, const string
             glLinkProgram(result);
             glDetachShader(result, shader);
         }
-        checkShader(result, path, true);
+        //checkShader(result, path, true);
     }
     glDeleteShader(shader);
 
@@ -240,7 +235,6 @@ uint32_t AMaterialGL::buildShader(uint8_t type, const string &path, const string
             t++;
         }
     }
-
     return result;
 }
 

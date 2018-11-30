@@ -31,11 +31,11 @@ CommandBufferGL::CommandBufferGL() {
 
     m_StaticVertex.clear();
     string flags    = TYPE_STATIC;
-    m_Static    = m_StaticVertex.buildShader(AMaterialGL::Vertex, gVertex, flags);
+    m_Static    = m_StaticVertex.buildShader(AMaterialGL::Vertex, m_StaticVertex.loadIncludes(gVertex, flags));
 
     flags   += "\n";
     flags   += INSTACED;
-    m_Instanced = m_StaticVertex.buildShader(AMaterialGL::Vertex, gVertex, flags);
+    m_Instanced = m_StaticVertex.buildShader(AMaterialGL::Vertex, m_StaticVertex.loadIncludes(gVertex, flags));
 
     m_ModelLocation = glGetUniformLocation(m_Static, "t_model");
 

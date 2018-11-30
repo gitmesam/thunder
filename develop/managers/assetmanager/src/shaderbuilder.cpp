@@ -412,6 +412,7 @@ void ShaderBuilder::save(const QString &path) {
 
 bool ShaderBuilder::build() {
     cleanup();
+
     // Nodes
     QString str;
     buildRoot(str);
@@ -443,12 +444,6 @@ bool ShaderBuilder::build() {
 
     addPragma("version", "#version 430 core");
     addPragma("material", m_Shader.toStdString());
-
-    string buff = loadIncludes(".embedded/Surface.frag", "");
-    vector<uint32_t> spv = SpirVConverter::glslToSpv(buff);
-    if(!spv.empty()) {
-        qDebug() << SpirVConverter::spvToGlsl(spv).c_str();
-    }
 
     return true;
 }
@@ -491,7 +486,38 @@ Variant ShaderBuilder::data() const {
     }
     user["Textures"]    = textures;
     user["Properties"]  = properties;
-    user["Shader"]      = m_Shader.toStdString();
+
+    string define;
+    switch(m_BlendMode) {
+        case Additive: {
+            define  = "#define BLEND_ADDITIVE 1";
+        } break;
+        case Translucent: {
+            define  = "#define BLEND_TRANSLUCENT 1";
+        } break;
+        default: {
+            define  = "#define BLEND_OPAQUE 1";
+        } break;
+    }
+    switch(m_LightModel) {
+        case Lit: {
+            define += "\n#define MODEL_LIT 1";
+        } break;
+        case Subsurface: {
+            define += "\n#define MODEL_SUBSURFACE 1";
+        } break;
+        default: {
+            define += "\n#define MODEL_UNLIT 1";
+        } break;
+    }
+
+    string buff = loadIncludes(".embedded/Surface.frag", define);
+    vector<uint32_t> spv = SpirVConverter::glslToSpv(buff);
+    if(!spv.empty()) {
+        user["Shader"] = SpirVConverter::spvToGlsl(spv);
+    }
+
+    define += "\n#define SIMPLE 1";
 
     return user;
 }
@@ -577,7 +603,7 @@ void ShaderBuilder::addPragma(const string &key, const string &value) {
     m_Pragmas[key]  = m_Pragmas[key].append(value).append("\r\n");
 }
 
-string ShaderBuilder::parseData(const string &data, const string &define) {
+string ShaderBuilder::parseData(const string &data, const string &define) const {
     stringstream input;
     stringstream output;
     input << data;
@@ -593,7 +619,7 @@ string ShaderBuilder::parseData(const string &data, const string &define) {
             } else {
                 auto it = m_Pragmas.find(matches[1]);
                 if(it != m_Pragmas.end()) {
-                    output << m_Pragmas[matches[1]] << endl;
+                    output << m_Pragmas.at(matches[1]) << endl;
                 }
             }
         } else {
@@ -603,7 +629,7 @@ string ShaderBuilder::parseData(const string &data, const string &define) {
     return output.str();
 }
 
-string ShaderBuilder::loadIncludes(const string &path, const string &define) {
+string ShaderBuilder::loadIncludes(const string &path, const string &define) const {
     Text *text  = Engine::loadResource<Text>(path);
     if(text) {
         return parseData(text->text(), define);

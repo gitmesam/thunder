@@ -177,8 +177,8 @@ private:
     void                        cleanup                     ();
 
     void                        addPragma                   (const string &key, const string &value);
-    string                      parseData                   (const string &data, const string &define);
-    string                      loadIncludes                (const string &path, const string &define);
+    string                      parseData                   (const string &data, const string &define) const;
+    string                      loadIncludes                (const string &path, const string &define) const;
 
     typedef map<QString, uint8_t>   UniformMap;
 
