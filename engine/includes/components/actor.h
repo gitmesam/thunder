@@ -4,15 +4,15 @@
 #include "engine.h"
 
 class Component;
-class Scene;
 class Transform;
+class Prefab;
 
 class NEXT_LIBRARY_EXPORT Actor : public Object {
-    A_REGISTER(Actor, Object, Scene);
+    A_REGISTER(Actor, Object, Scene)
 
     A_PROPERTIES(
         A_PROPERTY(bool, Enable, Actor::isEnable, Actor::setEnable)
-    );
+    )
 
 public:
     Actor                       ();
@@ -20,8 +20,6 @@ public:
     bool                        isEnable                () const;
 
     uint8_t                     layers                  () const;
-
-    Scene                      &scene                   () const;
 
     Transform                  *transform               ();
 
@@ -36,9 +34,7 @@ public:
 
     void                        setLayers               (const uint8_t layers);
 
-    void                        setScene                (Scene &scene);
-
-    Component                  *addComponent            (const string &name);
+    Component                  *addComponent            (const string &type);
 
     template<typename T>
     T                          *addComponent            () {
@@ -47,15 +43,27 @@ public:
 
     void                        setParent               (Object *parent);
 
+    bool                        isPrefab                () const;
+
+    void                        setPrefab               (Actor *prefab);
+
+    bool                        isSerializable          () const;
+
+protected:
+    void                        addChild                (Object *value);
+
+    void                        loadUserData            (const VariantMap &data);
+
+    VariantMap                  saveUserData            () const;
+
 protected:
     uint8_t                     m_Layers;
 
     bool                        m_Enable;
 
-    Scene                      *m_pScene;
-
     Transform                  *m_pTransform;
 
+    Actor                      *m_pPrefab;
 };
 
 #endif // ACTOR_H

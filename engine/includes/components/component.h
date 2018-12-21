@@ -7,12 +7,12 @@ class Actor;
 class ICommandBuffer;
 
 class NEXT_LIBRARY_EXPORT Component : public Object {
-    A_REGISTER(Component, Object, Components);
+    A_REGISTER(Component, Object, Components)
 
     A_PROPERTIES (
         A_PROPERTY(bool, Enable, Component::isEnable, Component::setEnable)
-    );
-    A_NOMETHODS();
+    )
+    A_NOMETHODS()
 
 public:
     Component                   ();
@@ -29,8 +29,17 @@ public:
 
     void                        setEnable               (bool enable);
 
+    bool                        isStarted               () const;
+
+    void                        setStarted              (bool started);
+
+protected:
+    bool                        isSerializable          () const;
+
 protected:
     bool                        m_Enable;
+
+    bool                        m_Started;
 
 };
 

@@ -16,19 +16,12 @@ public:
 
     const char                 *name                        () const;
 
-    void                        update                      (Scene &scene, uint32_t resource = 0);
-
-    void                        overrideController          (IController *controller);
-
-    void                        resize                      (uint32_t, uint32_t);
+    void                        update                      (Scene &, uint32_t = 0);
 
 protected:
-    Camera                     *activeCamera                ();
-
     ALCdevice                  *m_pDevice;
     ALCcontext                 *m_pContext;
 
-    IController                *m_pController;
 };
 
 #endif // MEDIASYSTEM_H

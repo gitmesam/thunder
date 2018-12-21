@@ -5,9 +5,11 @@
 
 #include "resources/pipeline.h"
 
+Camera *Camera::s_pCurrent  = nullptr;
+
 Camera::Camera() {
     m_FOV       = 45.0; // 2*arctan(height/(2*distance))
-    m_Near      = 0.1;
+    m_Near      = 0.1f;
     m_Far       = 1000.0;
     m_Ratio     = 1.0;
     m_Focal     = 1.0;
@@ -19,7 +21,7 @@ Camera::Camera() {
 
 Pipeline *Camera::pipeline() {
     if(m_pPipeline == nullptr) {
-        m_pPipeline = Engine::objectCreate<Pipeline>("", this);
+        m_pPipeline = Engine::objectCreate<Pipeline>("Pipeline");
     }
     return m_pPipeline;
 }
@@ -49,7 +51,7 @@ bool Camera::project(const Vector3 &ws, const Matrix4 &modelview, const Matrix4 
     out = modelview * in;
     in  = projection * out;
 
-    if(in.w == 0.0) {
+    if(in.w == 0.0f) {
         return false;
     }
     in.w    = 1.0f / in.w;
@@ -71,13 +73,13 @@ bool Camera::unproject(const Vector3 &ss, const Matrix4 &modelview, const Matrix
 
     final   = (projection * modelview).inverse();
 
-    in.x    = (ss.x) * 2.0 - 1.0;
-    in.y    = (ss.y) * 2.0 - 1.0;
+    in.x    = (ss.x) * 2.0f - 1.0f;
+    in.y    = (ss.y) * 2.0f - 1.0f;
     in.z    = 2.0f * ss.z - 1.0f;
     in.w    = 1.0f;
     out     = final * in;
 
-    if(out.w == 0.0) {
+    if(out.w == 0.0f) {
         return false;
     }
     out.w   = 1.0f / out.w;
@@ -97,9 +99,10 @@ Ray Camera::castRay(float x, float y) {
 
     Vector3 view;
     if(m_Ortho) {
-        p   = Vector3(p.x + x * m_OrthoWidth, p.y - y * m_OrthoWidth / m_Ratio, p.z);
+        p   = Vector3(p.x + (x - 0.5f) * m_OrthoWidth,
+                      p.y - (y - 0.5f) * m_OrthoWidth / m_Ratio, p.z);
     } else {
-        float tang      = tan(m_FOV * DEG2RAD * 0.5);
+        float tang      = tan(m_FOV * DEG2RAD);
         Vector3 right   = dir.cross(Vector3(0.0f, 1.0f, 0.0f)); /// \todo: Temp
         Vector3 up      = right.cross(dir);
         view    = Vector3( (x - 0.5f) * tang * m_Ratio) * right +
@@ -180,12 +183,12 @@ array<Vector3, 8> Camera::frustumCorners(float nearPlane, float farPlane) const 
     float nw;
     float fw;
     if(m_Ortho) {
-        nw    = m_OrthoWidth * 0.5;
+        nw    = m_OrthoWidth * 0.5f;
         fw    = nw;
         nh    = nw / m_Ratio;
         fh    = nh;
     } else {
-        float tang  = tanf(m_FOV * DEG2RAD * 0.5);
+        float tang  = tanf(m_FOV * DEG2RAD * 0.5f);
         nh    = nearPlane * tang;
         fh    = farPlane * tang;
         nw    = nh * m_Ratio;
@@ -212,4 +215,12 @@ array<Vector3, 8> Camera::frustumCorners(float nearPlane, float farPlane) const 
             fc + up * fh + right * fw,
             fc - up * fh + right * fw,
             fc - up * fh - right * fw};
+}
+
+Camera *Camera::current() {
+    return s_pCurrent;
+}
+
+void Camera::setCurrent(Camera *current) {
+    s_pCurrent  = current;
 }

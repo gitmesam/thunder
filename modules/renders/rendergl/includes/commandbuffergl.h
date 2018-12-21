@@ -18,7 +18,9 @@ public:
 
     void                        drawMesh                    (const Matrix4 &model, Mesh *mesh, uint32_t surface = 0, uint8_t layer = ICommandBuffer::DEFAULT, MaterialInstance *material = nullptr);
 
-    void                        setRenderTarget             (const TargetBuffer &target, const RenderTexture *depth = nullptr, bool equal = false);
+    void                        drawMeshInstanced           (const Matrix4 *models, uint32_t count, Mesh *mesh, uint32_t surface = 0, uint8_t layer = ICommandBuffer::DEFAULT, MaterialInstance *material = nullptr, bool particle = false);
+
+    void                        setRenderTarget             (const TargetBuffer &target, const RenderTexture *depth = nullptr);
 
     void                        setRenderTarget             (uint32_t target);
 
@@ -30,7 +32,7 @@ public:
 
     void                        setGlobalTexture            (const char *name, const Texture *value);
 
-    void                        setViewport                 (uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+    void                        setViewport                 (int32_t x, int32_t y, int32_t width, int32_t height);
 
     Matrix4                     projection                  () const { return m_Projection; }
 
@@ -39,20 +41,16 @@ public:
     const Texture              *texture                     (const char *name) const;
 
 protected:
-    uint32_t                    handle                      (AMeshGL *mesh, uint32_t surface, uint32_t lod);
+    void                        bindVao                     (AMeshGL *mesh, uint32_t surface, uint32_t lod);
 
-    void                        updateValues                ();
+    void                        putUniforms                 (uint32_t program, MaterialInstance *instance);
 
 protected:
     AMaterialGL                 m_StaticVertex;
 
-    uint32_t                    m_Static;
-
     uint32_t                    m_Pipeline;
 
-  //uint32_t                    m_Transform;
-
-    int32_t                     m_ModelLocation;
+    uint32_t                    m_InstanceBuffer;
 
     Matrix4                     m_View;
 

@@ -15,22 +15,22 @@
 #include <components/spritemesh.h>
 #include <components/textmesh.h>
 
-#include "graph/viewport.h"
+#include "graph/sceneview.h"
 
-CameraCtrl::CameraCtrl(Viewport *view) :
-        IController(),
+CameraCtrl::CameraCtrl(QOpenGLWidget *view) :
+        mCameraMove(MoveTypes::MOVE_IDLE),
+        mCameraFree(true),
         mBlockMove(false),
         mBlockRot(false),
-        mCameraFree(true),
-        mCameraMove(MoveTypes::MOVE_IDLE),
         mCameraSpeed(Vector3()),
         m_pCamera(nullptr),
-        m_pView(view) {
+        m_pView(view),
+        m_pActiveCamera(nullptr) {
 }
 
 void CameraCtrl::init(Scene *scene) {
-    m_pCamera   = Engine::createActor("Camera", scene);
-    m_pCamera->setScene(*scene);
+    Q_UNUSED(scene)
+    m_pCamera   = Engine::objectCreate<Actor>("Camera");
     m_pActiveCamera = m_pCamera->addComponent<Camera>();
     m_pActiveCamera->setFocal(10.0f);
     m_pActiveCamera->setOrthoWidth(10.0f);
@@ -117,6 +117,7 @@ void CameraCtrl::setFocusOn(Actor *actor, float &bottom) {
             }
 
             if(mesh) {
+                radius = 0;
                 uint32_t i  = 0;
                 for(uint32_t s = 0; s < mesh->surfacesCount(); s++) {
                     AABBox aabb = mesh->bound(s);
@@ -135,6 +136,8 @@ void CameraCtrl::setFocusOn(Actor *actor, float &bottom) {
                 pos    /= size;
                 radius /= size;
                 radius /= sinf(m_pActiveCamera->fov() * DEG2RAD);
+            } else {
+                radius = 1.0f;
             }
 
         }

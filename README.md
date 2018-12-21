@@ -6,24 +6,39 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/06a1475c3d7241d6b70cd7d28c680142)](https://www.codacy.com/app/eprikazchikov/thunder?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=eprikazchikov/thunder&amp;utm_campaign=Badge_Grade)
 ### About
 
-Thunder Engine is a multifunctional light weight game engine written by Evgeniy Prikazchikov for creating 2D and 3D games. It provides a wide range of frameworks and tools. So developers can focus on the creation, and the Thunder Engine will do the routine.
+Thunder Engine is an opensource multifunctional light weight game engine for creating 2D and 3D games. It provides a wide range of frameworks and tools. So developers can focus on the creation, and the Thunder Engine will do the routine.
 ![Screenshot of Thunder Engine](https://raw.githubusercontent.com/eprikazchikov/thunder/master/doc/media/ScreenShot01.png)
 
 #### Supported Platforms
 - Windows
 - MacOS X
+- Linux (Technical Preview)
+
+#### Render
+- Rendering System Based on Physical Principles
+- Deferred Shading
+- CookTorance Lighting model
+- Cascaded Shadow Maps (PPSM)
+
+#### Animation
+- Animation engine is based on "Animate Everything" principles
+
+#### Audio
+- 2D/3D Audio engine
+- Ogg/Vorbis, MP3, WAV file formats support
+
+#### Engine
+- Entity Component System based Object Management System
+- Scene Graph object management approach
+- MetaObject model for Objects
+- Event driven Inter Object Communication System
+
 #### Set of Tools
 - Multifunctional Scene Editor
 - Node Based Material Editor
 - Resource Management system with bunch of converters
 - Ready for CI Project Builder
-#### Main Features
-- Entity Component System based Object Management System
-- Scene Graph object management approach
-- MetaObject model for Objects
-- Event driven Inter Object Communication System
-- Rendering System Based on Physical Principles
-- CookTorance Lighting model
+
 ### Getting the Engine
 #### Compiling from source
 * Make sure the Qt (>= 5.10) SDK installed.

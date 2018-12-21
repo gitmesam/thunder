@@ -7,7 +7,6 @@
 #include <QTimer>
 #include <QImage>
 
-#include <patterns/asingleton.h>
 #include <engine.h>
 #include <module.h>
 
@@ -19,54 +18,64 @@ class ProjectManager;
 class CodeManager;
 
 struct Template {
-    Template                    () :
+    Template() :
         type(MetaType::INVALID) {
 
     }
-    Template                    (const QString &p, uint32_t t = MetaType::INVALID) :
+    Template(const QString &p, uint32_t t = MetaType::INVALID) :
         path(p),
         type(t) {
 
     }
 
-    QString                     path;
-    uint32_t                    type;
+    QString path;
+    uint32_t type;
 };
 
 Q_DECLARE_METATYPE(Template)
 
 class IAssetEditor {
 public:
-    IAssetEditor                (Engine *engine) :
+    IAssetEditor            (Engine *engine) :
             m_bModified(false) {
         m_pEngine   = engine;
     }
 
-    virtual void                loadAsset           (IConverterSettings *settings) = 0;
+    virtual ~IAssetEditor() {}
 
-    void                        setModified         (bool value) { m_bModified = value; }
-    bool                        isModified          () { return m_bModified; }
+    virtual void            loadAsset           (IConverterSettings *settings) = 0;
+
+    void                    setModified         (bool value) { m_bModified = value; }
+    bool                    isModified          () { return m_bModified; }
 
 protected:
-    Engine                     *m_pEngine;
+    Engine                 *m_pEngine;
 
-    bool                        m_bModified;
+    bool                    m_bModified;
 
 };
 
-class AssetManager : public QObject, public ASingleton<AssetManager> {
+class AssetManager : public QObject {
     Q_OBJECT
 public:
-    void                    init                ();
+    static AssetManager    *instance            ();
+
+    static void             destroy             ();
+
+    void                    init                (Engine *engine);
 
     void                    addEditor           (uint8_t type, IAssetEditor *editor);
     QObject                *openEditor          (const QFileInfo &source);
 
     int32_t                 resourceType        (const QFileInfo &source);
 
+    int32_t                 toContentType       (int32_t type);
+
     void                    removeResource      (const QFileInfo &source);
     void                    renameResource      (const QFileInfo &oldName, const QFileInfo &newName);
     void                    duplicateResource   (const QFileInfo &source);
+
+    void                    makePrefab          (const QString &source, const QFileInfo &target);
 
     bool                    pushToImport        (const QFileInfo &source);
     bool                    import              (const QFileInfo &source, const QFileInfo &target);
@@ -93,7 +102,7 @@ signals:
     void                    directoryChanged    (const QString &path);
     void                    fileChanged         (const QString &path);
 
-    void                    imported            (const QString &path, uint8_t type);
+    void                    imported            (const QString &path, uint32_t type);
     void                    importStarted       (int count, const QString &stage);
     void                    importFinished      ();
 
@@ -104,14 +113,22 @@ protected slots:
 
     void                    onDirectoryChanged  (const QString &path, bool force = false);
 
-protected:
-    friend class ASingleton<AssetManager>;
+private:
+    AssetManager            ();
+    ~AssetManager           ();
 
-    typedef QMap<uint8_t, IAssetEditor *>   EditorsMap;
+    static AssetManager    *m_pInstance;
+
+
+protected:
+    typedef QMap<int32_t, IAssetEditor *>   EditorsMap;
     EditorsMap              m_Editors;
 
-    typedef QMap<QString, uint8_t>          FormatsMap;
+    typedef QMap<QString, int32_t>          FormatsMap;
     FormatsMap              m_Formats;
+
+    typedef QMap<int32_t, int32_t>          ContentTypeMap;
+    ContentTypeMap          m_ContentTypes;
 
     typedef QMap<QString, IConverter *>     ConverterMap;
     ConverterMap            m_Converters;
@@ -129,10 +146,9 @@ protected:
 
     QTimer                 *m_pTimer;
 
-protected:
-    AssetManager            ();
-    ~AssetManager           ();
+    Engine                 *m_pEngine;
 
+protected:
     void                    cleanupBundle       ();
     void                    dumpBundle          ();
 

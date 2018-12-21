@@ -8,7 +8,7 @@
 class Pipeline;
 
 class NEXT_LIBRARY_EXPORT Camera : public Component {
-    A_REGISTER(Camera, Component, Components);
+    A_REGISTER(Camera, Component, Components)
 
     A_PROPERTIES(
         A_PROPERTY(float, Fov,  Camera::fov, Camera::setFov),
@@ -18,7 +18,7 @@ class NEXT_LIBRARY_EXPORT Camera : public Component {
         A_PROPERTY(float, Focal_Distance, Camera::focal, Camera::setFocal),
         A_PROPERTY(Color, Background_Color, Camera::color, Camera::setColor),
         A_PROPERTY(bool, Orthographic, Camera::orthographic, Camera::setOrthographic)
-    );
+    )
 
 public:
     Camera                      ();
@@ -60,6 +60,9 @@ public:
 
     array<Vector3, 8>           frustumCorners          (float nearPlane, float farPlane) const;
 
+    static Camera              *current                 ();
+    static void                 setCurrent              (Camera *current);
+
 protected:
     bool                        m_Ortho;
 
@@ -78,6 +81,8 @@ protected:
     Vector4                     m_Color;
 
     Pipeline                   *m_pPipeline;
+
+    static Camera              *s_pCurrent;
 };
 
 #endif // CAMERA_H

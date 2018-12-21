@@ -9,17 +9,19 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QMetaProperty>
+#include <QUrl>
 
 #include <zlib.h>
-#if __linux__
 #include <cstring>
-#endif
 
 #include "config.h"
 
 #include <json.h>
 
 #include "converters/converter.h"
+
+#include "components/scene.h"
+#include "components/actor.h"
 
 #include "animconverter.h"
 #include "codemanager.h"
@@ -28,6 +30,8 @@
 #include "materialconverter.h"
 #include "fbxconverter.h"
 #include "fontconverter.h"
+#include "prefabconverter.h"
+#include "effectconverter.h"
 
 #include "projectmanager.h"
 
@@ -42,9 +46,12 @@ const QString gEntry(".entry");
 const QString gCompany(".company");
 const QString gProject(".project");
 
+AssetManager *AssetManager::m_pInstance   = nullptr;
+
 Q_DECLARE_METATYPE(IConverterSettings *)
 
-AssetManager::AssetManager() {
+AssetManager::AssetManager() :
+        m_pEngine(nullptr) {
     m_pProjectManager   = ProjectManager::instance();
     m_pCodeManager      = CodeManager::instance();
 
@@ -67,6 +74,8 @@ AssetManager::AssetManager() {
     registerConverter(new MaterialConverter());
     registerConverter(new FBXConverter());
     registerConverter(new FontConverter());
+    registerConverter(new PrefabConverter());
+    registerConverter(new EffectConverter());
 
     m_Formats["map"]    = IConverter::ContentMap;
     m_Formats["cpp"]    = IConverter::ContentCode;
@@ -77,7 +86,20 @@ AssetManager::~AssetManager() {
     m_Editors.clear();
 }
 
-void AssetManager::init() {
+AssetManager *AssetManager::instance() {
+    if(!m_pInstance) {
+        m_pInstance = new AssetManager;
+    }
+    return m_pInstance;
+}
+
+void AssetManager::destroy() {
+    delete m_pInstance;
+    m_pInstance = nullptr;
+}
+
+void AssetManager::init(Engine *engine) {
+    m_pEngine   = engine;
     QString target  = m_pProjectManager->targetPath();
 
     onDirectoryChanged(m_pProjectManager->resourcePath() + "/engine/shaders",  !target.isEmpty());
@@ -120,6 +142,14 @@ int32_t AssetManager::resourceType(const QFileInfo &source) {
     return MetaType::INVALID;
 }
 
+int32_t AssetManager::toContentType(int32_t type) {
+    auto it = m_ContentTypes.find(type);
+    if(it != m_ContentTypes.end()) {
+        return it.value();
+    }
+    return type;
+}
+
 bool AssetManager::pushToImport(const QFileInfo &source) {
     onFileChanged(source.absoluteFilePath(), true);
     return true;
@@ -143,7 +173,7 @@ void AssetManager::reimport() {
 
 bool AssetManager::isOutdated(IConverterSettings *settings) {
     bool result     = true;
-    uint32_t crc    = crc32(0L, Z_NULL, 0);
+    uint32_t crc    = crc32(0L, nullptr, 0);
 
     QFile file(settings->source());
     if(file.open(QIODevice::ReadOnly)) {
@@ -151,7 +181,7 @@ bool AssetManager::isOutdated(IConverterSettings *settings) {
         while(!file.atEnd()) {
             memset(buffer, 0, BUFF_SIZE);
             file.read(buffer, BUFF_SIZE);
-            crc    = crc32(crc, (Bytef *)buffer, BUFF_SIZE);
+            crc    = crc32(crc, reinterpret_cast<Bytef *>(buffer), BUFF_SIZE);
         }
         file.close();
 
@@ -303,6 +333,37 @@ void AssetManager::duplicateResource(const QFileInfo &source) {
     dumpBundle();
 }
 
+void AssetManager::makePrefab(const QString &source, const QFileInfo &target) {
+    Actor *actor  = dynamic_cast<Actor *>(m_pEngine->scene()->find(source.toStdString()));
+    if(actor) {
+        Actor *prefab   = static_cast<Actor *>(actor->clone());
+        QString path    = target.absoluteFilePath() + "/" + QUrl(source).fileName() + ".fab";
+        QFile file(path);
+        if(file.open(QIODevice::WriteOnly)) {
+            string str  = Json::save(Engine::toVariant(prefab), 0);
+            file.write(static_cast<const char *>(&str[0]), str.size());
+            file.close();
+
+            IConverterSettings *settings    = createSettings(path);
+            saveSettings(settings);
+
+            if(settings->type() != IConverter::ContentCode) {
+                QDir dir(m_pProjectManager->contentPath());
+                string source   = dir.relativeFilePath(settings->source()).toStdString();
+                m_Guids[source] = settings->destination();
+                m_Paths[settings->destination()]    = source;
+
+                string dest = settings->destination();
+                Engine::setResource(prefab, dest);
+            }
+            dumpBundle();
+
+            actor->setPrefab(prefab);
+        }
+    }
+
+}
+
 bool AssetManager::import(const QFileInfo &source, const QFileInfo &target) {
     QString name    = source.baseName();
     QString path;
@@ -317,7 +378,7 @@ bool AssetManager::import(const QFileInfo &source, const QFileInfo &target) {
 
 IConverterSettings *AssetManager::createSettings(const QFileInfo &source) {
     IConverterSettings *settings;
-    uint8_t type    = MetaType::INVALID;
+    uint32_t type   = MetaType::INVALID;
     auto it = m_Converters.find(source.completeSuffix().toLower());
     if(it != m_Converters.end()) {
         type    = it.value()->type();
@@ -352,7 +413,8 @@ IConverterSettings *AssetManager::createSettings(const QFileInfo &source) {
 void AssetManager::registerConverter(IConverter *converter) {
     if(converter) {
         foreach (QString format, QString::fromStdString(converter->format()).split(';')) {
-            m_Formats[format.toLower()]     = converter->type();
+            m_Formats[format.toLower()]     = converter->contentType();
+            m_ContentTypes[converter->type()]   = converter->contentType();
             m_Converters[format.toLower()]  = converter;
         }
     }
@@ -394,6 +456,15 @@ QImage AssetManager::icon(const QString &path) {
         } break;
         case IConverter::ContentFont: {
             icon.load(":/Style/styles/dark/images/ttf.png", "PNG");
+        } break;
+        case IConverter::ContentAnimation: {
+            icon.load(":/Style/styles/dark/images/anim.png", "PNG");
+        } break;
+        case IConverter::ContentSound: {
+            icon.load(":/Style/styles/dark/images/wav.png", "PNG");
+        } break;
+        case IConverter::ContentPrefab: {
+            icon.load(":/Style/styles/dark/images/prefab.png", "PNG");
         } break;
         default: {
             QStringList list;
@@ -461,12 +532,12 @@ void AssetManager::onPerform() {
 
                 m_Guids[source] = settings->destination();
                 m_Paths[settings->destination()]    = source;
-                for(int i = 0; i < settings->subItemsCount(); i++) {
+                for(uint32_t i = 0; i < settings->subItemsCount(); i++) {
                     m_Paths[settings->subItem(i)]   = source;
                 }
                 saveSettings(settings);
 
-                emit imported(QString::fromStdString(m_Paths[settings->destination()].toString()), settings->type());
+                emit imported(QString::fromStdString(m_Paths[settings->destination()].toString()), toContentType(settings->type()));
             }
         }
     } else {
@@ -497,7 +568,7 @@ void AssetManager::onFileChanged(const QString &path, bool force) {
                 string guid     = settings->destination();
                 m_Guids[source] = guid;
                 m_Paths[guid]   = source;
-                for(int i = 0; i < settings->subItemsCount(); i++) {
+                for(uint32_t i = 0; i < settings->subItemsCount(); i++) {
                     m_Paths[settings->subItem(i)]   = source;
                 }
             }
@@ -537,12 +608,12 @@ bool AssetManager::convert(IConverterSettings *settings) {
             }
             m_Guids[source] = settings->destination();
             m_Paths[settings->destination()]    = source;
-            for(int i = 0; i < settings->subItemsCount(); i++) {
+            for(uint32_t i = 0; i < settings->subItemsCount(); i++) {
                 m_Paths[settings->subItem(i)]   = source;
             }
             saveSettings(settings);
 
-            emit imported(QString::fromStdString(source), settings->type());
+            emit imported(QString::fromStdString(source), toContentType(settings->type()));
 
             return true;
         }
@@ -568,10 +639,10 @@ void AssetManager::saveSettings(IConverterSettings *settings) {
     obj.insert(gCRC, int(settings->crc()));
     obj.insert(gGUID, settings->destination());
     obj.insert(gSettings, set);
-    obj.insert(gType, settings->type());
+    obj.insert(gType, static_cast<int>(settings->type()));
 
     QJsonArray subItems;
-    for(int i = 0; i < settings->subItemsCount(); i++) {
+    for(uint32_t i = 0; i < settings->subItemsCount(); i++) {
         subItems.append(settings->subItem(i));
     }
     obj.insert(gSubItems, subItems);

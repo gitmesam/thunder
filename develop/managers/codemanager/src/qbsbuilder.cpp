@@ -45,10 +45,12 @@ QbsBuilder::QbsBuilder() :
 
     connect( m_pProcess, SIGNAL(finished(int,QProcess::ExitStatus)), this, SIGNAL(buildFinished(int)) );
 
-#if _WIN32
+#if defined(Q_OS_WIN)
     m_Profiles << "MSVC2015-x86";
-#elif __APPLE__
+#elif defined(Q_OS_MAC)
     m_Profiles << "xcode-macosx-x86_64";
+#elif defined(Q_OS_UNIX)
+    m_Profiles << "clang";
 #endif
     m_Profiles << "Android";
 

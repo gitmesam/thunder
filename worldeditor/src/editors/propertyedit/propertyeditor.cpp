@@ -43,7 +43,7 @@ Property *createCustomProperty(const QString &name, QObject *propertyObject, Pro
     if(userType == QMetaType::type("Template"))
         return new TemplateProperty(name, propertyObject, parent);
 
-    return 0;
+    return nullptr;
 }
 
 class PropertyFilter : public QSortFilterProxyModel {
@@ -75,7 +75,7 @@ protected:
 
 class PropertyDelegate : public QStyledItemDelegate {
 public:
-    explicit PropertyDelegate(QObject *parent = 0) :
+    explicit PropertyDelegate(QObject *parent = nullptr) :
         QStyledItemDelegate(parent) {
 
         m_finishedMapper    = new QSignalMapper(this);
@@ -106,13 +106,15 @@ public:
 
     virtual void setEditorData(QWidget *editor, const QModelIndex &index) const {
         m_finishedMapper->blockSignals(true);
-        QModelIndex origin  = static_cast<const QSortFilterProxyModel *>(index.model())->mapToSource(index);
-        QVariant data   = origin.model()->data(origin, Qt::EditRole);
+        if(index.isValid()) {
+            const QSortFilterProxyModel *model = static_cast<const QSortFilterProxyModel *>(index.model());
+            QModelIndex origin  = model->mapToSource(index);
+            QVariant data   = origin.model()->data(origin, Qt::EditRole);
 
-        if(!static_cast<Property *>(origin.internalPointer())->setEditorData(editor, data)) {
-            QStyledItemDelegate::setEditorData(editor, index);
+            if(!static_cast<Property *>(origin.internalPointer())->setEditorData(editor, data)) {
+                QStyledItemDelegate::setEditorData(editor, index);
+            }
         }
-
         m_finishedMapper->blockSignals(false);
     }
 

@@ -49,7 +49,7 @@ void Transform::setScale(const Vector3 &value) {
     m_Dirty = true;
 }
 
-Matrix4 Transform::worldTransform() {
+Matrix4 &Transform::worldTransform() {
     if(m_Dirty) {
         for(auto &it : actor().findChildren<Actor *>(false)) {
             it->transform()->m_Dirty = true;
@@ -72,8 +72,8 @@ Vector3 Transform::worldPosition() const {
     Actor *cur  = dynamic_cast<Actor *>(actor().parent());
     while(cur) {
         Transform *t    = cur->transform();
-        result += t->m_Position;
         result  = result * t->m_Scale;
+        result += t->m_Position;
         result  = t->m_Rotation.toMatrix() * result;
         cur     = dynamic_cast<Actor *>(cur->parent());
     }

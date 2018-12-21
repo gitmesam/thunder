@@ -3,7 +3,6 @@
 #include <AL/al.h>
 
 #include <log.h>
-#include <controller.h>
 
 #include <analytics/profiler.h>
 #include <components/camera.h>
@@ -14,15 +13,16 @@
 #include "resources/audioclip.h"
 
 MediaSystem::MediaSystem(Engine *engine) :
+        ISystem(engine),
         m_pDevice(nullptr),
-        m_pContext(nullptr),
-        m_pController(nullptr),
-        ISystem(engine) {
+        m_pContext(nullptr) {
     PROFILER_MARKER;
 
-    AudioSource::registerClassFactory();
+    ObjectSystem system;
 
-    AudioClip::registerClassFactory();
+    AudioSource::registerClassFactory(&system);
+
+    AudioClip::registerClassFactory(&system);
 }
 
 MediaSystem::~MediaSystem() {
@@ -35,9 +35,9 @@ MediaSystem::~MediaSystem() {
 bool MediaSystem::init() {
     PROFILER_MARKER;
 
-    m_pDevice   = alcOpenDevice(0);
+    m_pDevice   = alcOpenDevice(nullptr);
     if(m_pDevice) {
-        m_pContext  = alcCreateContext(m_pDevice, 0);
+        m_pContext  = alcCreateContext(m_pDevice, nullptr);
         if(alcGetError(m_pDevice) == AL_NO_ERROR) {
             alcMakeContextCurrent(m_pContext);
 
@@ -51,10 +51,10 @@ const char *MediaSystem::name() const {
     return "Media";
 }
 
-void MediaSystem::update(Scene &scene, uint32_t resource) {
+void MediaSystem::update(Scene &, uint32_t) {
     PROFILER_MARKER;
 
-    Camera *camera  = activeCamera();
+    Camera *camera  = Camera::current();
     if(camera) {
         Actor &a    = camera->actor();
 
@@ -70,22 +70,4 @@ void MediaSystem::update(Scene &scene, uint32_t resource) {
 
         alListenerfv(AL_ORIENTATION, orientation);
     }
-}
-
-void MediaSystem::overrideController(IController *controller) {
-    PROFILER_MARKER;
-
-    m_pController   = controller;
-}
-
-void MediaSystem::resize(uint32_t, uint32_t) {
-    PROFILER_MARKER;
-
-}
-
-Camera *MediaSystem::activeCamera() {
-    if(m_pController) {
-        return m_pController->activeCamera();
-    }
-    return m_pEngine->controller()->activeCamera();
 }

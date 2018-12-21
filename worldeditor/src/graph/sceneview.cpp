@@ -8,19 +8,22 @@
 
 #include <engine.h>
 #include <system.h>
-#include <controller.h>
+
 #include <components/actor.h>
 #include <components/scene.h>
 #include <components/camera.h>
 
-#include "common.h"
+#include <resources/pipeline.h>
+
+#include "controllers/cameractrl.h"
+
 #include "pluginmodel.h"
 
 SceneView::SceneView(QWidget *parent) :
         QOpenGLWidget(parent),
         m_pController(nullptr),
         m_pScene(nullptr),
-        m_GameMode(false) {
+        m_MouseButtons(0) {
 
     setMouseTracking(true);
 }
@@ -40,22 +43,8 @@ void SceneView::setScene(Scene *scene) {
     PluginModel::instance()->addScene(m_pScene);
 }
 
-void SceneView::setController(IController *ctrl) {
+void SceneView::setController(CameraCtrl *ctrl) {
     m_pController   = ctrl;
-}
-
-void SceneView::startGame() {
-    m_pScene->start();
-
-    m_GameMode  = true;
-}
-
-void SceneView::stopGame() {
-    m_GameMode  = false;
-}
-
-bool SceneView::isGame() const {
-    return m_GameMode;
 }
 
 void SceneView::initializeGL() {
@@ -65,9 +54,6 @@ void SceneView::initializeGL() {
     foreach(ISystem *it, m_Systems) {
         if(it) {
             it->init();
-            if(m_pController) {
-                it->overrideController(m_pController);
-            }
         }
     }
 
@@ -80,11 +66,10 @@ void SceneView::paintGL() {
     }
     if(m_pScene) {
         findCamera();
-        m_pScene->update();
+
         uint32_t handle = defaultFramebufferObject();
         foreach(ISystem *it, m_Systems) {
             if(it) {
-                it->resize(width(), height());
                 it->update(*m_pScene, handle);
             }
         }
@@ -94,16 +79,29 @@ void SceneView::paintGL() {
 void SceneView::resizeGL(int width, int height) {
     QOpenGLWidget::resizeGL(width, height);
 
-    foreach(ISystem *it, m_Systems) {
-        if(it) {
-            it->resize(width, height);
+    if(m_pController) {
+        Camera *camera  = Camera::current();
+        if(camera) {
+            camera->pipeline()->resize(width, height);
         }
     }
+}
+
+void SceneView::mousePressEvent(QMouseEvent *ev) {
+    m_MouseButtons  = ev->buttons();
+}
+
+void SceneView::mouseReleaseEvent(QMouseEvent *ev) {
+    m_MouseButtons  = ev->buttons();
 }
 
 void SceneView::findCamera() {
     Actor *chunk    = m_pScene->findChild<Actor *>(false);
     if(chunk && m_pController) {
-        m_pController->setActiveCamera(chunk->findChild<Camera *>());
+        Camera *camera  = chunk->findChild<Camera *>();
+        if(camera) {
+            camera->pipeline()->resize(width(), height());
+        }
+        Camera::setCurrent(camera);
     }
 }

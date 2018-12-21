@@ -89,10 +89,10 @@ void ARenderTextureGL::apply() {
 
     if(target == GL_TEXTURE_CUBE_MAP) {
         for(int i = 0; i < 6; i++) {
-            glTexImage2D( GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, internal, m_Width, m_Height, 0, format, type, 0 );
+            glTexImage2D( GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, internal, m_Width, m_Height, 0, format, type, nullptr );
         }
     } else {
-        glTexImage2D    ( target, 0, internal, m_Width, m_Height, 0, format, type, 0 );
+        glTexImage2D    ( target, 0, internal, m_Width, m_Height, 0, format, type, nullptr );
     }
 
 }
@@ -101,5 +101,5 @@ void ARenderTextureGL::makeCurrent(uint32_t index) const {
     if(index == 0) {
         glBindFramebuffer(GL_FRAMEBUFFER, m_Buffer);
     }
-    glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + index, GL_TEXTURE_2D, m_ID, 0 );
+    glFramebufferTexture2D( GL_FRAMEBUFFER, (m_DepthBits) ? GL_DEPTH_ATTACHMENT : GL_COLOR_ATTACHMENT0 + index, GL_TEXTURE_2D, m_ID, 0 );
 }

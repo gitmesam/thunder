@@ -18,6 +18,20 @@ const QString gIncludes("${Includes}");
 
 #include "qbsbuilder.h"
 
+CodeManager *CodeManager::m_pInstance   = nullptr;
+
+CodeManager *CodeManager::instance() {
+    if(!m_pInstance) {
+        m_pInstance = new CodeManager;
+    }
+    return m_pInstance;
+}
+
+void CodeManager::destroy() {
+    delete m_pInstance;
+    m_pInstance = nullptr;
+}
+
 void CodeManager::init() {
     m_Suffixes << "cpp" << "h";
 
@@ -88,8 +102,8 @@ void CodeManager::buildProject() {
         while(it.hasNext()) {
             it.next();
             includes << "#include \"" + it.value() + "\"\n";
-            values[gRegisterComponents].append(it.key() + "::registerClassFactory();\n\t\t");
-            values[gUnregisterComponents].append(it.key() + "::unregisterClassFactory();\n\t\t");
+            values[gRegisterComponents].append(it.key() + "::registerClassFactory(&system);\n\t\t");
+            values[gUnregisterComponents].append(it.key() + "::unregisterClassFactory(&system);\n\t\t");
             values[gComponentNames].append("result.push_back(\"" + it.key() + "\");\n\t\t");
         }
         includes.removeDuplicates();

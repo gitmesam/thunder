@@ -6,6 +6,10 @@ Project {
         if(qbs.targetOS.contains("windows")) {
             return "/windows/x86";
         }
+        if(qbs.targetOS.contains("linux")) {
+            return "/linux/x86_64"
+        }
+
         return "/macos/x86_64";
     }
     property string sdkPath: "${sdkPath}"
@@ -22,7 +26,7 @@ Project {
             "plugin.cpp" ]
         Depends { name: "cpp" }
 
-        cpp.defines: ["BUILD_SHARED", "NEXT_LIBRARY"]
+        cpp.defines: ["NEXT_SHARED", "NEXT_LIBRARY"]
         cpp.includePaths: project.includePaths
         cpp.libraryPaths: [ ${libraryPaths}
             project.sdkPath + project.platform + "/bin"
@@ -30,7 +34,6 @@ Project {
         cpp.dynamicLibraries: [
             "next-editor",
             "engine-editor" ]
-        cpp.cxxLanguageVersion: "c++14"
 
         Group {
             name: "Install Plugin"
@@ -58,16 +61,15 @@ Project {
         ]
 
         cpp.staticLibraries: [
-            "next",
             "engine",
+            "next",
             "physfs",
             "freetype",
             "zlib",
             "glfw",
-            "glad",
-            "rendergl"
+            "rendergl",
+            "glad"
         ]
-        cpp.cxxLanguageVersion: "c++14"
 
         Properties {
             condition: qbs.targetOS.contains("windows")
@@ -78,7 +80,10 @@ Project {
                 "Advapi32",
                 "opengl32"
             ]
-            //qbs.debugInformation: true
+        }
+        Properties {
+            condition: qbs.targetOS.contains("linux")
+            cpp.dynamicLibraries: [ "X11", "Xrandr", "Xi", "Xxf86vm", "Xcursor", "Xinerama", "dl", "pthread" ]
         }
         Properties {
             condition: qbs.targetOS.contains("darwin")

@@ -3,10 +3,9 @@
 #include "agl.h"
 
 #include <components/camera.h>
+#include <components/scene.h>
 
 #include <resources/pipeline.h>
-
-#include <controller.h>
 
 #include <analytics/profiler.h>
 #include <log.h>
@@ -17,27 +16,30 @@
 #include "commandbuffergl.h"
 
 RenderGLSystem::RenderGLSystem(Engine *engine) :
-        ISystem(engine),
-        m_pController(nullptr) {
+        ISystem(engine) {
     PROFILER_MARKER;
 
-    ATextureGL::registerClassFactory();
-    ARenderTextureGL::registerClassFactory();
-    AMaterialGL::registerClassFactory();
-    AMeshGL::registerClassFactory();
+    ObjectSystem system;
 
-    CommandBufferGL::registerClassFactory();
+    ATextureGL::registerClassFactory(&system);
+    ARenderTextureGL::registerClassFactory(&system);
+    AMaterialGL::registerClassFactory(&system);
+    AMeshGL::registerClassFactory(&system);
+
+    CommandBufferGL::registerClassFactory(&system);
 }
 
 RenderGLSystem::~RenderGLSystem() {
     PROFILER_MARKER;
 
-    ATextureGL::unregisterClassFactory();
-    ARenderTextureGL::unregisterClassFactory();
-    AMaterialGL::unregisterClassFactory();
-    AMeshGL::unregisterClassFactory();
+    ObjectSystem system;
 
-    CommandBufferGL::unregisterClassFactory();
+    ATextureGL::unregisterClassFactory(&system);
+    ARenderTextureGL::unregisterClassFactory(&system);
+    AMaterialGL::unregisterClassFactory(&system);
+    AMeshGL::unregisterClassFactory(&system);
+
+    CommandBufferGL::unregisterClassFactory(&system);
 }
 
 /*!
@@ -73,31 +75,10 @@ void RenderGLSystem::update(Scene &scene, uint32_t resource) {
     PROFILER_RESET(POLYGONS);
     PROFILER_RESET(DRAWCALLS);
 
-    Camera *camera  = m_pEngine->controller()->activeCamera();
-    if(m_pController) {
-        camera  = m_pController->activeCamera();
-    }
-
+    Camera *camera  = Camera::current();
     if(camera) {
-        camera->pipeline()->draw(scene, resource);
-    }
-}
-
-void RenderGLSystem::overrideController(IController *controller) {
-    PROFILER_MARKER;
-
-    m_pController   = controller;
-}
-
-void RenderGLSystem::resize(uint32_t width, uint32_t height) {
-    PROFILER_MARKER;
-
-    Camera *camera  = m_pEngine->controller()->activeCamera();
-    if(m_pController) {
-        camera  = m_pController->activeCamera();
-    }
-
-    if(camera) {
-        camera->pipeline()->resize(width, height);
+        Pipeline *pipe  = camera->pipeline();
+        pipe->combineComponents(scene, true);
+        pipe->draw(scene, *camera, resource);
     }
 }
