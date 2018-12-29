@@ -11,7 +11,8 @@
 AnimationClipModel::AnimationClipModel(QObject *parent) :
         QAbstractItemModel(parent),
         m_pController(nullptr),
-        m_isHighlighted(false) {
+        m_isHighlighted(false),
+        m_Position(0.0f) {
 
 }
 
@@ -106,4 +107,83 @@ void AnimationClipModel::setHighlighted(const QModelIndex &index) {
         emit layoutChanged();
     }
 
+}
+
+int AnimationClipModel::keysCount(int index) const {
+    if(m_pController && m_pController->clip() && index >= 0) {
+        return (*std::next(m_pController->clip()->m_Tracks.begin(), index)).curve.size();
+    }
+    return 0;
+}
+
+unsigned int AnimationClipModel::keyPosition(int track, int index) const {
+    if(m_pController && m_pController->clip() && track >= 0 && index >= 0) {
+        auto &curve = (*std::next(m_pController->clip()->m_Tracks.begin(), track)).curve;
+        return (*std::next(curve.begin(), index)).mPosition;
+    }
+    return 0;
+}
+
+float AnimationClipModel::position() const {
+    return m_Position;
+}
+
+void AnimationClipModel::setPosition(float value) {
+    m_Position = value;
+
+    if(m_pController) {
+        m_pController->setPosition(1000 * m_Position);
+    }
+
+    emit positionChanged();
+}
+
+void AnimationClipModel::onAddKey(int row, qreal value) {
+    if(row >= 0) {
+        AnimationClip *clip = m_pController->clip();
+
+        VariantAnimation::Curve &curve = (*std::next(clip->m_Tracks.begin(), row)).curve;
+
+        KeyFrame key;
+        key.mPosition   = round(value * 1000.0);
+
+        VariantAnimation anim;
+        anim.setKeyFrames(curve);
+        anim.setCurrentTime(key.mPosition);
+
+        key.mValue  = anim.currentValue();
+
+        /// \todo build support points
+
+        curve.push_back(key);
+        curve.sort(AnimationClip::compare);
+
+        emit layoutAboutToBeChanged();
+        emit layoutChanged();
+    }
+}
+
+void AnimationClipModel::onRemoveKey(int row, int index) {
+    if(row >= 0 && index >= 0) {
+        AnimationClip *clip = m_pController->clip();
+
+        VariantAnimation::Curve &curve = (*std::next(clip->m_Tracks.begin(), row)).curve;
+        curve.erase(std::next(curve.begin(), index));
+
+        emit layoutAboutToBeChanged();
+        emit layoutChanged();
+    }
+}
+#include <QDebug>
+void AnimationClipModel::onMoveKey(int row, int index, qreal value) {
+    qDebug() << value;
+    if(row >= 0 && index >= 0) {
+        AnimationClip *clip = m_pController->clip();
+
+        VariantAnimation::Curve &curve = (*std::next(clip->m_Tracks.begin(), row)).curve;
+        (*std::next(curve.begin(), index)).mPosition = round(value * 1000.0);
+
+        emit layoutAboutToBeChanged();
+        emit layoutChanged();
+    }
 }

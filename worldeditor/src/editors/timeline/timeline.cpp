@@ -14,6 +14,8 @@
 #include "projectmanager.h"
 
 #include <QSettings>
+#include <QQmlContext>
+#include <QQuickItem>
 
 bool compare(const AnimationClip::Track &first, const AnimationClip::Track &second) {
     if(first.path == second.path) {
@@ -34,12 +36,22 @@ Timeline::Timeline(QWidget *parent) :
 
     readSettings();
 
-    ui->treeView->setModel(new AnimationClipModel(this));
+    AnimationClipModel *model   = new AnimationClipModel(this);
+
+    ui->treeView->setModel(model);
     ui->treeView->setContextMenuPolicy(Qt::CustomContextMenu);
     ui->treeView->setMouseTracking(true);
 
+    ui->quickTimeline->rootContext()->setContextProperty("clipModel", model);
+    ui->quickTimeline->setSource(QUrl("qrc:/QML/qml/Timeline.qml"));
+
     ui->record->setProperty("checkred", true);
     ui->play->setProperty("checkgreen", true);
+
+    QQuickItem *item = ui->quickTimeline->rootObject();
+    connect(item, SIGNAL(addKey(int,qreal)), model, SLOT(onAddKey(int,qreal)));
+    connect(item, SIGNAL(removeKey(int,int)), model, SLOT(onRemoveKey(int,int)));
+    connect(item, SIGNAL(moveKey(int,int,qreal)), model, SLOT(onMoveKey(int,int,qreal)));
 
     connect(ui->timeline, SIGNAL(moved(uint32_t)), this, SLOT(onMoved(uint32_t)));
     connect(ui->timeline, SIGNAL(changed()), this, SLOT(onModified()));
@@ -275,11 +287,11 @@ void Timeline::onScaled() {
 
 void Timeline::timerEvent(QTimerEvent *) {
     if(m_pController) {
-        uint32_t ms = m_pController->position() + static_cast<uint32_t>(Timer::deltaTime() * 1000.0);
+        uint32_t ms = m_pController->position() + static_cast<uint32_t>(Timer::deltaTime() * 1000.0f);
         if(ms >= m_pController->duration()) {
             on_begin_clicked();
         } else {
-            m_pController->setPosition(ms);
+            static_cast<AnimationClipModel *>(ui->treeView->model())->setPosition(ms / 1000.0f);
             ui->timeline->setPosition(ms);
         }
     }

@@ -41,5 +41,6 @@
     </qresource>
     <qresource prefix="/QML">
         <file>qml/Emitters.qml</file>
+        <file>qml/Timeline.qml</file>
     </qresource>
 </RCC>

@@ -13,7 +13,7 @@ class AnimationController;
 class TimelineEditor : public GraphWidget {
     Q_OBJECT
 public:
-    TimelineEditor          (QWidget *parent = 0);
+    TimelineEditor          (QWidget *parent = nullptr);
 
     void                    draw                (QPainter &painter, const QRect &r);
 

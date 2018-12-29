@@ -6,6 +6,10 @@
 class AnimationController;
 
 class AnimationClipModel : public QAbstractItemModel {
+    Q_OBJECT
+
+    Q_PROPERTY(float position READ position WRITE setPosition NOTIFY positionChanged)
+
 public:
     AnimationClipModel          (QObject *parent);
 
@@ -25,12 +29,29 @@ public:
 
     void                        setHighlighted              (const QModelIndex &index);
 
+    Q_INVOKABLE int             keysCount                   (int index) const;
+
+    Q_INVOKABLE unsigned int    keyPosition                 (int track, int index) const;
+
+    float                       position                    () const;
+    void                        setPosition                 (float value);
+
+public slots:
+    void                        onAddKey                    (int row, qreal value);
+    void                        onRemoveKey                 (int row, int index);
+    void                        onMoveKey                   (int row, int index, qreal value);
+
+signals:
+    void                        positionChanged             ();
+
 protected:
     AnimationController        *m_pController;
 
     bool                        m_isHighlighted;
 
     QModelIndex                 m_HoverIndex;
+
+    float                       m_Position;
 };
 
 #endif // ANIMATIONCLIPMODEL_H
