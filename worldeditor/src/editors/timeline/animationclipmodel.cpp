@@ -143,10 +143,10 @@ void AnimationClipModel::onAddKey(int row, qreal value) {
         curve.push_back(key);
         curve.sort(AnimationClip::compare);
 
+        emit changed();
+
         emit layoutAboutToBeChanged();
         emit layoutChanged();
-
-        emit changed();
     }
 }
 
@@ -157,10 +157,10 @@ void AnimationClipModel::onRemoveKey(int row, int index) {
         VariantAnimation::Curve &curve = (*std::next(clip->m_Tracks.begin(), row)).curve;
         curve.erase(std::next(curve.begin(), index));
 
+        emit changed();
+
         emit layoutAboutToBeChanged();
         emit layoutChanged();
-
-        emit changed();
     }
 }
 
@@ -171,9 +171,9 @@ void AnimationClipModel::onMoveKey(int row, int index, qreal value) {
         VariantAnimation::Curve &curve = (*std::next(clip->m_Tracks.begin(), row)).curve;
         (*std::next(curve.begin(), index)).mPosition = round(value * 1000.0);
 
+        emit changed();
+
         emit layoutAboutToBeChanged();
         emit layoutChanged();
-
-        emit changed();
     }
 }

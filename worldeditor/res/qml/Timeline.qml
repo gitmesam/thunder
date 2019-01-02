@@ -44,6 +44,7 @@ Rectangle {
     Connections {
         target: clipModel
         onLayoutChanged: {
+            repeater.model = 0
             repeater.model = clipModel.rowCount()
 
             maxPos = 0
@@ -157,17 +158,40 @@ Rectangle {
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
                     onDoubleClicked: {
                         addKey(row, Math.max(Math.round((mouseX - posX) / stepSize), 0) * timeScale)
                     }
                     onClicked: {
                         selectKey = -1
                         selectRow = -1
+
+                        if(mouse.button === Qt.RightButton) {
+                            menu.x = mouseX
+                            menu.y = mouseY
+                            menu.open()
+                        }
+                    }
+
+                    Menu {
+                        id: menu
+                        y: parent.height
+
+                        MenuItem {
+                            text: qsTr("Add Key")
+                            onTriggered: addKey(row, Math.max(Math.round((menu.x - posX) / stepSize), 0) * timeScale)
+                        }
+                        MenuItem {
+                            text: qsTr("Delete Key")
+                            onTriggered: removeKey(selectRow, selectKey)
+                        }
                     }
                 }
 
                 Repeater {
+                    id: keys
                     model: clipModel.keysCount(row)
+
                     Rectangle {
                         id: key
                         color: (selectKey == index && selectRow == row) ? hoverBlueColor : "#a0606060"
