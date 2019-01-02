@@ -12,7 +12,7 @@ AnimationClipModel::AnimationClipModel(QObject *parent) :
         QAbstractItemModel(parent),
         m_pController(nullptr),
         m_isHighlighted(false),
-        m_Position(0.0f) {
+        m_Position(0.0f){
 
 }
 
@@ -94,21 +94,6 @@ int AnimationClipModel::rowCount(const QModelIndex &parent) const {
     return 0;
 }
 
-void AnimationClipModel::setHighlighted(const QModelIndex &index) {
-    if(index != m_HoverIndex || !m_isHighlighted) {
-        if(m_isHighlighted) {
-            emit dataChanged(m_HoverIndex, m_HoverIndex);
-        }
-        m_HoverIndex    = index;
-        m_isHighlighted = true;
-        emit dataChanged(index, index);
-
-        emit layoutAboutToBeChanged();
-        emit layoutChanged();
-    }
-
-}
-
 int AnimationClipModel::keysCount(int index) const {
     if(m_pController && m_pController->clip() && index >= 0) {
         return (*std::next(m_pController->clip()->m_Tracks.begin(), index)).curve.size();
@@ -145,7 +130,7 @@ void AnimationClipModel::onAddKey(int row, qreal value) {
         VariantAnimation::Curve &curve = (*std::next(clip->m_Tracks.begin(), row)).curve;
 
         KeyFrame key;
-        key.mPosition   = round(value * 1000.0);
+        key.mPosition = round(value * 1000.0);
 
         VariantAnimation anim;
         anim.setKeyFrames(curve);
@@ -160,6 +145,8 @@ void AnimationClipModel::onAddKey(int row, qreal value) {
 
         emit layoutAboutToBeChanged();
         emit layoutChanged();
+
+        emit changed();
     }
 }
 
@@ -172,11 +159,12 @@ void AnimationClipModel::onRemoveKey(int row, int index) {
 
         emit layoutAboutToBeChanged();
         emit layoutChanged();
+
+        emit changed();
     }
 }
-#include <QDebug>
+
 void AnimationClipModel::onMoveKey(int row, int index, qreal value) {
-    qDebug() << value;
     if(row >= 0 && index >= 0) {
         AnimationClip *clip = m_pController->clip();
 
@@ -185,5 +173,7 @@ void AnimationClipModel::onMoveKey(int row, int index, qreal value) {
 
         emit layoutAboutToBeChanged();
         emit layoutChanged();
+
+        emit changed();
     }
 }

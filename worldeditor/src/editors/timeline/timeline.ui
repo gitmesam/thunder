@@ -191,7 +191,7 @@
         <number>2</number>
        </property>
        <property name="bottomMargin">
-        <number>10</number>
+        <number>0</number>
        </property>
        <item>
         <widget class="QTreeView" name="treeView">
@@ -234,42 +234,6 @@
            </property>
           </widget>
          </item>
-         <item>
-          <widget class="TimelineEditor" name="timeline" native="true"/>
-         </item>
-         <item>
-          <widget class="QScrollBar" name="horizontalScrollBar">
-           <property name="maximum">
-            <number>0</number>
-           </property>
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item>
-        <layout class="QVBoxLayout" name="verticalLayout_5">
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>20</number>
-         </property>
-         <property name="bottomMargin">
-          <number>10</number>
-         </property>
-         <item>
-          <widget class="QScrollBar" name="verticalScrollBar">
-           <property name="maximum">
-            <number>0</number>
-           </property>
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-          </widget>
-         </item>
         </layout>
        </item>
       </layout>
@@ -283,12 +247,6 @@
    <class>QQuickWidget</class>
    <extends>QWidget</extends>
    <header>QtQuickWidgets/QQuickWidget</header>
-  </customwidget>
-  <customwidget>
-   <class>TimelineEditor</class>
-   <extends>QWidget</extends>
-   <header>editors/timeline/timelineeditor.h</header>
-   <container>1</container>
   </customwidget>
  </customwidgets>
  <resources>

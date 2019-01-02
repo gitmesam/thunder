@@ -5,6 +5,8 @@ import QtGraphicalEffects 1.0
 Rectangle {
     id: rect
 
+    antialiasing: false
+
     color: "#606060"
     property string textColor: "#ffffff"
     property string emitterColor: "#40000000"
@@ -20,90 +22,115 @@ Rectangle {
     property string redColor: "#c62828"
     property string hoverRedColor: "#d32f2f"
 
-    property int minStep: 8
-    property int maxStep: 40
+    property int posX: (width / hbar.size * hbar.position)
+
+    property int rowHeight: 17
 
     property int selectKey: -1
     property int selectRow: -1
 
+    property int minStep: 8
+    property int maxStep: 40
+
+    property int maxPos: 0
+
+    property real timeScale: 0.01
+    property int stepSize: minStep
+
     signal addKey(int row, real position)
     signal removeKey(int row, int index)
     signal moveKey(int row, int index, real position)
+
+    Connections {
+        target: clipModel
+        onLayoutChanged: {
+            repeater.model = clipModel.rowCount()
+
+            maxPos = 0
+            for(var i = 0; i < repeater.model; i++) {
+                maxPos = Math.max(clipModel.keyPosition(i, clipModel.keysCount(i) - 1), maxPos)
+            }
+        }
+    }
 
     MouseArea {
         anchors.fill: parent
         onClicked: {
             selectKey = -1
             selectRow = -1
-            clipModel.position = Math.max(Math.round((mouseX - 40) / ruler.stepSize), 0) * ruler.timeScale
+            clipModel.position = Math.max(Math.round((mouseX - posX) / stepSize), 0) * timeScale
         }
         onWheel: {
             if(wheel.angleDelta.y > 0) {
-                ruler.stepSize += 1;
-                if(ruler.stepSize > maxStep) {
-                    if(ruler.timeScale > 0.01) {
-                        ruler.stepSize  = minStep;
-                        ruler.timeScale/= 5;
+                stepSize += 1;
+                if(stepSize > maxStep) {
+                    if(timeScale > 0.01) {
+                        stepSize = minStep;
+                        timeScale /= 5;
                     }
                 }
             } else {
-                ruler.stepSize -= 1;
-                if(ruler.stepSize < minStep) {
-                    ruler.stepSize = maxStep;
-                    ruler.timeScale*= 5;
+                stepSize -= 1;
+                if(stepSize < minStep) {
+                    stepSize = maxStep;
+                    timeScale *= 5.0;
                 }
             }
+        }
 
+        onPositionChanged: {
+            if(selectKey == -1) {
+                clipModel.position = Math.max(Math.round((mouseX - posX) / stepSize), 0) * timeScale
+            }
         }
     }
 
     Item {
         id: ruler
-
-        property int index: 0
-        property real timeScale: 0.01
-        property real timePos: 0.0
-        property int stepSize: minStep
-
-        x: 40
+        x: 0
         width: parent.width
         height: parent.height
 
+        property int shift: posX / (stepSize * 5)
         Repeater {
-            model: ruler.width / (ruler.stepSize * 5)
+            model: ruler.width / (stepSize * 5)
             Rectangle {
                 anchors.bottom: ruler.bottom
                 height: ruler.height - 12
                 width: 1
                 color: textColor
-                x: index * ruler.stepSize * 5
+                x: (index * 5) * stepSize - (posX % (stepSize * 5))
                 Label {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottom: parent.top
                     color: textColor
-                    text: ((index * 5) * ruler.timeScale).toLocaleString(Qt.locale("en_EN"), 'f', 2).replace('.', ':')
+                    text: {
+                        var value = ((index + ruler.shift) * 5) * timeScale
+                        return value.toLocaleString(Qt.locale("en_EN"), 'f', 2).replace('.', ':')
+                    }
                     font.pointSize: 8
+
+                    renderType: Text.NativeRendering
                 }
             }
         }
 
         Repeater {
-            model: ruler.width / ruler.stepSize
+            model: ruler.width / stepSize
             Rectangle {
                 anchors.bottom: ruler.bottom
                 height: ruler.height - 15
                 width: 1
+                x: index * stepSize - (posX % stepSize)
                 color: textColor
-                x: index * ruler.stepSize
             }
         }
     }
-
-    ListView {
+    Item {
         id: list
         anchors.fill: parent
-        anchors.topMargin: 19
 
+        anchors.topMargin: 19
         clip: true
 
         focus: true
@@ -115,11 +142,14 @@ Rectangle {
             }
         }
 
-        model: clipModel
-        delegate: Component {
+        Repeater {
+            id: repeater
+            anchors.fill: parent
+
             Rectangle {
-                height: 17
+                height: rowHeight
                 width: ruler.width
+                y: index * height - (rect.height / vbar.size * vbar.position)
                 color: "#a0808080"
 
                 property int row: index
@@ -128,7 +158,7 @@ Rectangle {
                     anchors.fill: parent
                     hoverEnabled: true
                     onDoubleClicked: {
-                        addKey(row, Math.max(Math.round((mouseX - 40) / ruler.stepSize), 0) * ruler.timeScale)
+                        addKey(row, Math.max(Math.round((mouseX - posX) / stepSize), 0) * timeScale)
                     }
                     onClicked: {
                         selectKey = -1
@@ -146,7 +176,7 @@ Rectangle {
                         height: 9
                         width: 9
 
-                        x: ((clipModel.keyPosition(row, index) / 1000.0) / ruler.timeScale) * ruler.stepSize + 40 - 4.5
+                        x: ((clipModel.keyPosition(row, index) / 1000.0) / timeScale) * stepSize - posX - 4.5
                         y: 2
                         rotation: 45
 
@@ -158,17 +188,18 @@ Rectangle {
                             drag.axis: Drag.XAxis
                             drag.minimumX: 0
                             drag.maximumX: ruler.width
+                            drag.threshold: 0
 
-                            drag.onDragFinished: {
-                                moveKey(row, index, Math.max(Math.round((key.x - 40) / ruler.stepSize), 0) * ruler.timeScale)
+                            drag.onActiveChanged: {
+                                if(!drag.active) {
+                                    moveKey(row, index, Math.max(Math.round((key.x - posX) / stepSize), 0) * timeScale)
+                                }
                             }
 
                             onPressed: {
                                 selectKey = index
                                 selectRow = row
                             }
-
-
                         }
                     }
                 }
@@ -182,15 +213,39 @@ Rectangle {
                 }
             }
         }
+
+        ScrollBar {
+            id: vbar
+            hoverEnabled: true
+            active: hovered || pressed
+            orientation: Qt.Vertical
+            size: parent.height / (repeater.model * rowHeight)
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+        }
+
+        ScrollBar {
+            id: hbar
+            hoverEnabled: true
+            active: hovered || pressed
+            orientation: Qt.Horizontal
+            size: {
+                var result = ((maxPos / 1000.0) / timeScale) * rect.stepSize
+                return parent.width / (result + maxStep * 2)
+            }
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+        }
     }
 
     Rectangle {
         id: position
 
-        x: (clipModel.position / ruler.timeScale) * ruler.stepSize + 40
+        x: (clipModel.position / timeScale) * stepSize - posX
         width: 1
         height: parent.height
         color: redColor
     }
-
 }

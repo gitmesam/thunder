@@ -27,8 +27,6 @@ public:
 
     int                         rowCount                    (const QModelIndex &) const;
 
-    void                        setHighlighted              (const QModelIndex &index);
-
     Q_INVOKABLE int             keysCount                   (int index) const;
 
     Q_INVOKABLE unsigned int    keyPosition                 (int track, int index) const;
@@ -42,6 +40,8 @@ public slots:
     void                        onMoveKey                   (int row, int index, qreal value);
 
 signals:
+    void                        changed                     ();
+
     void                        positionChanged             ();
 
 protected:
@@ -52,6 +52,7 @@ protected:
     QModelIndex                 m_HoverIndex;
 
     float                       m_Position;
+
 };
 
 #endif // ANIMATIONCLIPMODEL_H

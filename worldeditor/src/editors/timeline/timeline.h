@@ -7,6 +7,7 @@
 #include <object.h>
 
 class AnimationController;
+class AnimationClipModel;
 
 namespace Ui {
     class Timeline;
@@ -16,7 +17,7 @@ class Timeline : public QWidget {
     Q_OBJECT
 
 public:
-    explicit Timeline       (QWidget *parent = 0);
+    explicit Timeline       (QWidget *parent = nullptr);
     ~Timeline               ();
 
 signals:
@@ -31,10 +32,6 @@ public slots:
 
     void                    onChanged               (Object::ObjectList objects, const QString &property);
 
-    void                    onEntered               (const QModelIndex &index);
-
-    void                    onHovered               (uint32_t index);
-
 protected:
     void                    readSettings            ();
     void                    writeSettings           ();
@@ -48,13 +45,9 @@ protected:
     QString                 pathTo                  (Object *src, Object *dst);
 
 private slots:
-    void                    onMoved                 (uint32_t ms);
-
     void                    onModified              ();
 
     void                    onRemoveProperty        ();
-
-    void                    onScaled                ();
 
     void                    on_play_clicked         ();
 
@@ -80,6 +73,8 @@ private:
     QMenu                   m_ContentMenu;
 
     bool                    m_Modified;
+
+    AnimationClipModel     *m_pModel;
 
 };
 

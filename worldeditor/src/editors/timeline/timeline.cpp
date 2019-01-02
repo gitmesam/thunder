@@ -36,33 +36,26 @@ Timeline::Timeline(QWidget *parent) :
 
     readSettings();
 
-    AnimationClipModel *model   = new AnimationClipModel(this);
+    m_pModel = new AnimationClipModel(this);
 
-    ui->treeView->setModel(model);
+    ui->treeView->setModel(m_pModel);
     ui->treeView->setContextMenuPolicy(Qt::CustomContextMenu);
     ui->treeView->setMouseTracking(true);
 
-    ui->quickTimeline->rootContext()->setContextProperty("clipModel", model);
+    ui->quickTimeline->rootContext()->setContextProperty("clipModel", m_pModel);
     ui->quickTimeline->setSource(QUrl("qrc:/QML/qml/Timeline.qml"));
 
     ui->record->setProperty("checkred", true);
     ui->play->setProperty("checkgreen", true);
 
     QQuickItem *item = ui->quickTimeline->rootObject();
-    connect(item, SIGNAL(addKey(int,qreal)), model, SLOT(onAddKey(int,qreal)));
-    connect(item, SIGNAL(removeKey(int,int)), model, SLOT(onRemoveKey(int,int)));
-    connect(item, SIGNAL(moveKey(int,int,qreal)), model, SLOT(onMoveKey(int,int,qreal)));
+    connect(item, SIGNAL(addKey(int,qreal)), m_pModel, SLOT(onAddKey(int,qreal)));
+    connect(item, SIGNAL(removeKey(int,int)), m_pModel, SLOT(onRemoveKey(int,int)));
+    connect(item, SIGNAL(moveKey(int,int,qreal)), m_pModel, SLOT(onMoveKey(int,int,qreal)));
 
-    connect(ui->timeline, SIGNAL(moved(uint32_t)), this, SLOT(onMoved(uint32_t)));
-    connect(ui->timeline, SIGNAL(changed()), this, SLOT(onModified()));
-    connect(ui->timeline, SIGNAL(scaled()), this, SLOT(onScaled()));
-    connect(ui->horizontalScrollBar, SIGNAL(valueChanged(int)), ui->timeline, SLOT(onHScrolled(int)));
-    connect(ui->verticalScrollBar, SIGNAL(valueChanged(int)), ui->timeline, SLOT(onVScrolled(int)));
+    connect(m_pModel, SIGNAL(changed()), this, SLOT(onModified()));
 
-    connect(ui->verticalScrollBar, SIGNAL(valueChanged(int)), ui->treeView->verticalScrollBar(), SLOT(setValue(int)));
-
-    connect(ui->treeView, SIGNAL(entered(QModelIndex)), this, SLOT(onEntered(QModelIndex)));
-    connect(ui->timeline, SIGNAL(hovered(uint32_t)), this, SLOT(onHovered(uint32_t)));
+    connect(m_pModel, SIGNAL(positionChanged()), this, SIGNAL(moved()));
 
     m_ContentMenu.addAction(tr("Remove Properties"), this, SLOT(onRemoveProperty()));
 }
@@ -143,21 +136,14 @@ void Timeline::onObjectSelected(Object::ObjectList objects) {
 
     saveClip();
 
-    AnimationClipModel *model   = static_cast<AnimationClipModel *>(ui->treeView->model());
-
     m_pController   = nullptr;
-    ui->timeline->setClip(nullptr);
-
     for(auto object : objects) {
         m_pController  = findController(object);
         if(m_pController) {
             break;
         }
     }
-    model->setController(m_pController);
-    if(m_pController) {
-        ui->timeline->setClip(m_pController->clip());
-    }
+    m_pModel->setController(m_pController);
 
     bool enable = (m_pController != nullptr);
 
@@ -169,7 +155,7 @@ void Timeline::onObjectSelected(Object::ObjectList objects) {
     ui->next->setEnabled(enable);
     ui->previous->setEnabled(enable);
 
-    ui->treeView->setCurrentIndex(model->index(0, 0));
+    ui->treeView->setCurrentIndex(m_pModel->index(0, 0));
 
     emit animated(enable);
 
@@ -180,15 +166,6 @@ void Timeline::onChanged(Object::ObjectList objects, const QString &property) {
     for(auto it : objects) {
         onUpdated(it, property);
     }
-}
-
-void Timeline::onEntered(const QModelIndex &index) {
-    ui->timeline->setHovered(index.row());
-}
-
-void Timeline::onHovered(uint32_t index) {
-    AnimationClipModel *model   = static_cast<AnimationClipModel *>(ui->treeView->model());
-    model->setHighlighted(model->index(index, 0));
 }
 
 void Timeline::onUpdated(Object *object, const QString &property) {
@@ -237,24 +214,13 @@ void Timeline::onUpdated(Object *object, const QString &property) {
 
                     controller->setClip(clip);
                 }
-
-                ui->timeline->update();
-                static_cast<AnimationClipModel *>(ui->treeView->model())->setController(m_pController);
-
+                m_pModel->setController(m_pController);
                 onModified();
             }
         }
     }
 }
 
-void Timeline::onMoved(uint32_t ms) {
-    if(m_pController) {
-        ui->timeline->setPosition(ms);
-        m_pController->setPosition(ms);
-
-        emit moved();
-    }
-}
 
 void Timeline::onModified() {
     m_Modified  = true;
@@ -269,20 +235,10 @@ void Timeline::onRemoveProperty() {
 
         clip->m_Tracks.erase(it);
     }
-    static_cast<AnimationClipModel *>(ui->treeView->model())->setController(m_pController);
-    ui->timeline->update();
-
+    m_pModel->setController(m_pController);
     m_pController->setClip(clip);
 
     onModified();
-}
-
-void Timeline::onScaled() {
-    ui->horizontalScrollBar->setPageStep(ui->timeline->width());
-    ui->horizontalScrollBar->setMaximum(MAX(ui->timeline->clipWidth() - ui->timeline->width(), 0));
-
-    ui->verticalScrollBar->setPageStep(ui->timeline->height());
-    ui->verticalScrollBar->setMaximum(MAX(ui->timeline->clipHeight() - ui->timeline->height(), 0));
 }
 
 void Timeline::timerEvent(QTimerEvent *) {
@@ -291,8 +247,7 @@ void Timeline::timerEvent(QTimerEvent *) {
         if(ms >= m_pController->duration()) {
             on_begin_clicked();
         } else {
-            static_cast<AnimationClipModel *>(ui->treeView->model())->setPosition(ms / 1000.0f);
-            ui->timeline->setPosition(ms);
+            m_pModel->setPosition(ms / 1000.0f);
         }
     }
 }
@@ -307,19 +262,19 @@ void Timeline::on_play_clicked() {
 }
 
 void Timeline::on_begin_clicked() {
-    onMoved(0);
+    m_pModel->setPosition(0.0f);
 }
 
 void Timeline::on_end_clicked() {
-    onMoved(m_pController->duration());
+    m_pModel->setPosition(m_pController->duration() / 1000.0f);
 }
 
 void Timeline::on_previous_clicked() {
-    onMoved(findNear(true));
+    m_pModel->setPosition(findNear(true) / 1000.0f);
 }
 
 void Timeline::on_next_clicked() {
-    onMoved(findNear());
+    m_pModel->setPosition(findNear() / 1000.0f);
 }
 
 uint32_t Timeline::findNear(bool backward) {
