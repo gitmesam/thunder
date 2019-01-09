@@ -26,7 +26,9 @@ void AnimationClip::loadUserData(const VariantMap &data) {
                     k++;
                     key.mValue      = (*k);
                     k++;
-                    key.mSupport    = (*k);
+                    key.mLeftTangent = (*k);
+                    k++;
+                    key.mRightTangent= (*k);
                     track.curve.push_back(key);
                 }
                 m_Tracks.push_back(track);

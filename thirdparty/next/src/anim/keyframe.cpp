@@ -13,10 +13,11 @@ KeyFrame::KeyFrame(uint32_t position, Variant &value) :
 
 }
 
-KeyFrame::KeyFrame(uint32_t position, Variant &value, Variant &support) :
+KeyFrame::KeyFrame(uint32_t position, Variant &value, Variant &left, Variant &right) :
         mPosition(position),
         mType(Linear),
         mValue(value),
-        mSupport(support) {
+        mLeftTangent(left),
+        mRightTangent(right) {
 
 }

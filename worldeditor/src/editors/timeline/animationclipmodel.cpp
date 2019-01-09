@@ -37,15 +37,15 @@ QVariant AnimationClipModel::data(const QModelIndex &index, int role) const {
         case Qt::ToolTipRole:
         case Qt::DisplayRole: {
             QStringList lst = QString::fromStdString(it->path).split('/');
-            QString name    = lst.last();
-            uint32_t size   = lst.size();
+            QString name = lst.last();
+            int32_t size = lst.size();
             if(name.isEmpty()) {
                 name    = QString::fromStdString(m_pController->actor().name());
                 size    = 0;
             }
 
             QString spaces;
-            for(auto i = 0; i < size; i++) {
+            for(int32_t i = 0; i < size; i++) {
                 spaces  += "    ";
             }
             return QString("%1%2 : %3").arg(spaces).arg(name).arg(it->property.c_str());
@@ -54,7 +54,7 @@ QVariant AnimationClipModel::data(const QModelIndex &index, int role) const {
             if(m_isHighlighted && (index == m_HoverIndex)) {
                 return QColor(229, 0, 0);
             }
-        }
+        } break;
         default: break;
     }
 
@@ -107,6 +107,141 @@ unsigned int AnimationClipModel::keyPosition(int track, int index) const {
         return (*std::next(curve.begin(), index)).mPosition;
     }
     return 0;
+}
+
+QVariant AnimationClipModel::keyValue(int track, int index) const {
+    if(m_pController && m_pController->clip() && track >= 0 && index >= 0) {
+        auto &curve = (*std::next(m_pController->clip()->m_Tracks.begin(), track)).curve;
+        Variant v = (*std::next(curve.begin(), index)).mValue;
+
+        QVariantList list;
+
+        switch(v.userType()) {
+            case MetaType::VECTOR2: {
+                Vector2 vec = v.toVector2();
+                list = {2, vec.x, vec.y};
+            } break;
+            case MetaType::VECTOR3: {
+                Vector3 vec = v.toVector3();
+                list = {3, vec.x, vec.y, vec.z};
+            } break;
+            case MetaType::VECTOR4: {
+                Vector4 vec = v.toVector4();
+                list = {4, vec.x, vec.y, vec.z, vec.w};
+            } break;
+            default: {
+                float val = v.toFloat();
+                list = {1, val};
+            } break;
+        }
+
+        return list;
+    }
+    return QVariant();
+}
+
+QVariant AnimationClipModel::trackData(int track) const {
+    if(m_pController && m_pController->clip() && track >= 0) {
+        auto &curve = (*std::next(m_pController->clip()->m_Tracks.begin(), track)).curve;
+
+        QVariantList list;
+        uint32_t components = 0;
+        for(auto &it : curve) {
+            Variant v = it.mValue;
+            Variant t0 = it.mLeftTangent;
+            Variant t1 = it.mRightTangent;
+            QVariantList key;
+            switch(v.userType()) {
+                case MetaType::VECTOR2: {
+                    Vector2 val = v.toVector2();
+                    Vector2 tan0 = t0.toVector2();
+                    Vector2 tan1 = t1.toVector2();
+                    key = {it.mPosition, val.x, val.y,
+                                         tan0.x, tan0.y,
+                                         tan1.x, tan1.y};
+                    components = 2;
+                } break;
+                case MetaType::VECTOR3: {
+                    Vector3 val = v.toVector3();
+                    Vector3 tan0 = t0.toVector3();
+                    Vector3 tan1 = t1.toVector3();
+                    key = {it.mPosition, val.x, val.y, val.z,
+                                         tan0.x, tan0.y, tan0.z,
+                                         tan1.x, tan1.y, tan1.z};
+                    components = 3;
+                } break;
+                case MetaType::VECTOR4: {
+                    Vector4 val = v.toVector4();
+                    Vector4 tan0 = t0.toVector4();
+                    Vector4 tan1 = t1.toVector4();
+                    key = {it.mPosition, val.x, val.y, val.z, val.w,
+                                         tan0.x, tan0.y, tan0.z, tan0.w,
+                                         tan1.x, tan1.y, tan1.z, tan1.w};
+                    components = 4;
+                } break;
+                default: {
+                    float val = v.toFloat();
+                    float tan0 = t0.toFloat();
+                    float tan1 = t1.toFloat();
+                    key = {it.mPosition, val, tan0, tan1};
+                    components = 1;
+                } break;
+            }
+            list.push_back(key);
+        }
+        list.push_front(components);
+        return list;
+
+    }
+    return QVariant();
+}
+
+void AnimationClipModel::setTrackData(int track, const QVariant &data) {
+    if(m_pController && m_pController->clip() && track >= 0 && data.isValid()) {
+        auto &curve = (*std::next(m_pController->clip()->m_Tracks.begin(), track)).curve;
+        curve.clear();
+
+        QVariantList list = data.toList();
+        uint32_t components = list[0].toUInt();
+        list.pop_front();
+
+        foreach(QVariant it, list) {
+            QVariantList k = it.toList();
+
+            KeyFrame key;
+            key.mPosition = k[0].toUInt();
+            key.mType = KeyFrame::Cubic;
+            switch(components) {
+                case 2: {
+                    key.mValue        = Vector2(k[1].toFloat(), k[2].toFloat());
+                    key.mLeftTangent  = Vector2(k[3].toFloat(), k[4].toFloat());
+                    key.mRightTangent = Vector2(k[5].toFloat(), k[6].toFloat());
+                } break;
+                case 3: {
+                    key.mValue        = Vector3(k[1].toFloat(), k[2].toFloat(), k[3].toFloat());
+                    key.mLeftTangent  = Vector3(k[4].toFloat(), k[5].toFloat(), k[6].toFloat());
+                    key.mRightTangent = Vector3(k[7].toFloat(), k[8].toFloat(), k[9].toFloat());
+                } break;
+                case 4: {
+                    key.mValue        = Vector4(k[1].toFloat(), k[2].toFloat(), k[3].toFloat(), k[4].toFloat());
+                    key.mLeftTangent  = Vector4(k[5].toFloat(), k[6].toFloat(), k[7].toFloat(), k[8].toFloat());
+                    key.mRightTangent = Vector4(k[9].toFloat(), k[10].toFloat(), k[11].toFloat(), k[12].toFloat());
+                } break;
+                default: {
+                    key.mValue        = k[1].toFloat();
+                    key.mLeftTangent  = k[2].toFloat();
+                    key.mRightTangent = k[3].toFloat();
+                } break;
+            }
+
+            curve.push_back(key);
+        }
+
+        emit changed();
+
+        emit layoutAboutToBeChanged();
+        emit layoutChanged();
+    }
 }
 
 float AnimationClipModel::position() const {

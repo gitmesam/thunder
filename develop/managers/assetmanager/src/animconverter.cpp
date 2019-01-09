@@ -24,7 +24,8 @@ public:
                 key.push_back(int32_t(c.mPosition));
                 key.push_back(c.mType);
                 key.push_back(c.mValue);
-                key.push_back(c.mSupport);
+                key.push_back(c.mLeftTangent);
+                key.push_back(c.mRightTangent);
 
                 keys.push_back(key);
             }

@@ -55,7 +55,7 @@ Timeline::Timeline(QWidget *parent) :
 
     connect(m_pModel, SIGNAL(changed()), this, SLOT(onModified()));
 
-    connect(m_pModel, SIGNAL(positionChanged()), this, SIGNAL(moved()));
+    connect(m_pModel, SIGNAL(positionChanged()), this, SIGNAL(moved()), Qt::QueuedConnection);
 
     m_ContentMenu.addAction(tr("Remove Properties"), this, SLOT(onRemoveProperty()));
 }
@@ -100,7 +100,8 @@ void Timeline::saveClip() {
                     key.push_back(int32_t(c.mPosition));
                     key.push_back(c.mType);
                     key.push_back(c.mValue);
-                    key.push_back(c.mSupport);
+                    key.push_back(c.mLeftTangent);
+                    key.push_back(c.mRightTangent);
 
                     keys.push_back(key);
                 }
@@ -184,13 +185,17 @@ void Timeline::onUpdated(Object *object, const QString &property) {
 
                 bool create = true;
                 AnimationClip *clip = controller->clip();
+                if(clip == nullptr) {
+                    return;
+                }
                 for(auto &it : clip->m_Tracks) {
                     if(it.path == path.toStdString() && it.property == property.toStdString()) {
                         bool update = false;
                         for(auto &k : it.curve) {
                             if(k.mPosition == key.mPosition) {
-                                k.mValue    = key.mValue;
-                                k.mSupport  = key.mSupport;
+                                k.mValue = key.mValue;
+                                k.mLeftTangent = key.mLeftTangent;
+                                k.mRightTangent = key.mRightTangent;
                                 update  = true;
                             }
                         }
@@ -220,7 +225,6 @@ void Timeline::onUpdated(Object *object, const QString &property) {
         }
     }
 }
-
 
 void Timeline::onModified() {
     m_Modified  = true;
@@ -257,7 +261,7 @@ void Timeline::on_play_clicked() {
         killTimer(m_TimerId);
         m_TimerId   = 0;
     } else {
-        m_TimerId   = startTimer(16);
+        m_TimerId   = startTimer(2);
     }
 }
 

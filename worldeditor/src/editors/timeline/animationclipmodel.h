@@ -31,6 +31,12 @@ public:
 
     Q_INVOKABLE unsigned int    keyPosition                 (int track, int index) const;
 
+    Q_INVOKABLE QVariant        keyValue                    (int track, int index) const;
+
+    Q_INVOKABLE QVariant        trackData                   (int track) const;
+
+    Q_INVOKABLE void            setTrackData                (int track, const QVariant &data);
+
     float                       position                    () const;
     void                        setPosition                 (float value);
 

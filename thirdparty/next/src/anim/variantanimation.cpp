@@ -112,35 +112,35 @@ void VariantAnimation::update() {
                     if(a.mType == KeyFrame::Linear) {
                         setCurrentValue(MIX(a.mValue.toInt(), b.mValue.toInt(), factor));
                     } else {
-                        setCurrentValue(CMIX(a.mValue.toInt(), a.mSupport.toInt(), b.mSupport.toInt(), b.mValue.toInt(), factor));
+                        setCurrentValue(CMIX(a.mValue.toInt(), a.mRightTangent.toInt(), b.mLeftTangent.toInt(), b.mValue.toInt(), factor));
                     }
                 } break;
                 case MetaType::FLOAT: {
                     if(a.mType == KeyFrame::Linear) {
                         setCurrentValue(MIX(a.mValue.toFloat(), b.mValue.toFloat(), factor));
                     } else {
-                        setCurrentValue(CMIX(a.mValue.toFloat(), a.mSupport.toFloat(), b.mSupport.toFloat(), b.mValue.toFloat(), factor));
+                        setCurrentValue(CMIX(a.mValue.toFloat(), a.mRightTangent.toFloat(), b.mLeftTangent.toFloat(), b.mValue.toFloat(), factor));
                     }
                 } break;
                 case MetaType::VECTOR2: {
                     if(a.mType == KeyFrame::Linear) {
                         setCurrentValue(MIX(a.mValue.toVector2(), b.mValue.toVector2(), factor));
                     } else {
-                        setCurrentValue(CMIX(a.mValue.toVector2(), a.mSupport.toVector2(), b.mSupport.toVector2(), b.mValue.toVector2(), factor));
+                        setCurrentValue(CMIX(a.mValue.toVector2(), a.mRightTangent.toVector2(), b.mLeftTangent.toVector2(), b.mValue.toVector2(), factor));
                     }
                 } break;
                 case MetaType::VECTOR3: {
                     if(a.mType == KeyFrame::Linear) {
                         setCurrentValue(MIX(a.mValue.toVector3(), b.mValue.toVector3(), factor));
                     } else {
-                        setCurrentValue(CMIX(a.mValue.toVector3(), a.mSupport.toVector3(), b.mSupport.toVector3(), b.mValue.toVector3(), factor));
+                        setCurrentValue(CMIX(a.mValue.toVector3(), a.mRightTangent.toVector3(), b.mLeftTangent.toVector3(), b.mValue.toVector3(), factor));
                     }
                 } break;
                 case MetaType::VECTOR4: {
                     if(a.mType == KeyFrame::Linear) {
                         setCurrentValue(MIX(a.mValue.toVector4(), b.mValue.toVector4(), factor));
                     } else {
-                        setCurrentValue(CMIX(a.mValue.toVector4(), a.mSupport.toVector4(), b.mSupport.toVector4(), b.mValue.toVector4(), factor));
+                        setCurrentValue(CMIX(a.mValue.toVector4(), a.mRightTangent.toVector4(), b.mLeftTangent.toVector4(), b.mValue.toVector4(), factor));
                     }
                 } break;
                 case MetaType::QUATERNION: {
