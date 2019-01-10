@@ -14,9 +14,9 @@ public:
 public:
     KeyFrame                    ();
 
-    KeyFrame                    (uint32_t position, Variant &value);
+    KeyFrame                    (uint32_t position, const Variant &value);
 
-    KeyFrame                    (uint32_t position, Variant &value, Variant &left, Variant &right);
+    KeyFrame                    (uint32_t position, uint32_t type, const Variant &value, const Variant &left, const Variant &right);
 
     uint32_t                    mPosition;
 

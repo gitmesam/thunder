@@ -55,7 +55,7 @@ Timeline::Timeline(QWidget *parent) :
 
     connect(m_pModel, SIGNAL(changed()), this, SLOT(onModified()));
 
-    connect(m_pModel, SIGNAL(positionChanged()), this, SIGNAL(moved()), Qt::QueuedConnection);
+    connect(m_pModel, SIGNAL(positionChanged()), this, SIGNAL(moved()));
 
     m_ContentMenu.addAction(tr("Remove Properties"), this, SLOT(onRemoveProperty()));
 }
