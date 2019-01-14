@@ -130,6 +130,10 @@ AnimationController *Timeline::findController(Object *object) {
 }
 
 void Timeline::onObjectSelected(Object::ObjectList objects) {
+    if(objects.empty()) {
+        return;
+    }
+
     if(m_TimerId) {
         killTimer(m_TimerId);
         m_TimerId   = 0;
@@ -150,8 +154,12 @@ void Timeline::onObjectSelected(Object::ObjectList objects) {
 
     ui->begin->setEnabled(enable);
     ui->end->setEnabled(enable);
+
     ui->record->setEnabled(enable);
+    ui->record->setChecked(false);
+
     ui->play->setEnabled(enable);
+    ui->play->setChecked(false);
 
     ui->next->setEnabled(enable);
     ui->previous->setEnabled(enable);

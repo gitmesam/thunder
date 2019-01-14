@@ -42,5 +42,9 @@
     <qresource prefix="/QML">
         <file>qml/Emitters.qml</file>
         <file>qml/Timeline.qml</file>
+        <file>qml/Theme.qml</file>
+        <file>qml/CurveEditor.qml</file>
+        <file>qml/KeyframeEditor.qml</file>
+        <file>qml/ContextMenu.qml</file>
     </qresource>
 </RCC>
