@@ -2,33 +2,45 @@
 
 #include "agl.h"
 
-#include "analytics/profiler.h"
+#include <components/camera.h>
+#include <components/scene.h>
 
-#include "apipeline.h"
-#include "adeferredshading.h"
+#include <resources/pipeline.h>
 
-#include "components/adirectlightgl.h"
-
-#include "components/scene.h"
-
+#include <analytics/profiler.h>
 #include <log.h>
 
-RenderGLSystem::RenderGLSystem(Engine *engine) :
-        m_pPipeline(nullptr),
-        ISystem(engine) {
+#include "resources/atexturegl.h"
+#include "resources/arendertexturegl.h"
+
+#include "commandbuffergl.h"
+
+RenderGLSystem::RenderGLSystem() :
+        ISystem() {
     PROFILER_MARKER;
 
-    ATextureGL::registerClassFactory();
-    AMaterialGL::registerClassFactory();
-    AMeshGL::registerClassFactory();
+    ObjectSystem system;
 
-    ADirectLightGL::registerClassFactory();
+    ATextureGL::registerClassFactory(&system);
+    ARenderTextureGL::registerClassFactory(&system);
+    AMaterialGL::registerClassFactory(&system);
+    AMeshGL::registerClassFactory(&system);
+
+    CommandBufferGL::registerClassFactory(&system);
 }
 
 RenderGLSystem::~RenderGLSystem() {
     PROFILER_MARKER;
 
-    delete m_pPipeline;
+    ObjectSystem system;
+
+
+    ATextureGL::unregisterClassFactory(&system);
+    ARenderTextureGL::unregisterClassFactory(&system);
+    AMaterialGL::unregisterClassFactory(&system);
+    AMeshGL::unregisterClassFactory(&system);
+
+    CommandBufferGL::unregisterClassFactory(&system);
 }
 
 /*!
@@ -37,22 +49,17 @@ RenderGLSystem::~RenderGLSystem() {
 bool RenderGLSystem::init() {
     PROFILER_MARKER;
 
-    int32_t targets = 1;
-
-#ifndef GL_ES_VERSION_2_0
+#ifndef THUNDER_MOBILE
     if(!gladLoadGL()) {
         Log(Log::ERR) << "[ Render::RenderGLSystem ] Failed to initialize OpenGL context";
         return false;
     }
-
     glEnable        (GL_TEXTURE_CUBE_MAP_SEAMLESS);
-    glGetIntegerv	(GL_MAX_DRAW_BUFFERS, &targets);
 #endif
-    if(targets >= ADeferredShading::G_TARGETS) {
-        m_pPipeline = new ADeferredShading(m_pEngine);
-    } else {
-        m_pPipeline = new APipeline(m_pEngine);
-    }
+
+    int32_t targets;
+    glGetIntegerv	(GL_MAX_DRAW_BUFFERS, &targets);
+
     return true;
 }
 
@@ -63,26 +70,16 @@ const char *RenderGLSystem::name() const {
 /*!
     Main drawing procedure.
 */
-void RenderGLSystem::update(Scene &scene, uint32_t resource) {
+void RenderGLSystem::update(Scene *scene) {
     PROFILER_MARKER;
 
-    if(m_pPipeline) {
-        m_pPipeline->draw(scene, resource);
-    }
-}
+    PROFILER_RESET(POLYGONS);
+    PROFILER_RESET(DRAWCALLS);
 
-void RenderGLSystem::overrideController(IController *controller) {
-    PROFILER_MARKER;
-
-    if(m_pPipeline) {
-        m_pPipeline->overrideController(controller);
-    }
-}
-
-void RenderGLSystem::resize(uint32_t width, uint32_t height) {
-    PROFILER_MARKER;
-
-    if(m_pPipeline) {
-        m_pPipeline->resize(width, height);
+    Camera *camera  = Camera::current();
+    if(camera) {
+        Pipeline *pipe  = camera->pipeline();
+        pipe->combineComponents(scene, true);
+        pipe->draw(scene, *camera);
     }
 }

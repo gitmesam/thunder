@@ -9,8 +9,10 @@
 class TextSerial : public Text {
 public:
     void                        setData         (const QByteArray &data) {
-        m_Data.resize(data.size());
-        memcpy(&m_Data[0], data.data(), data.size());
+        if(!data.isEmpty()) {
+            m_Data.resize(data.size());
+            memcpy(&m_Data[0], data.data(), data.size());
+        }
     }
 
 protected:
@@ -28,7 +30,7 @@ uint8_t TextConverter::convertFile(IConverterSettings *settings) {
         text.setData(src.readAll());
         src.close();
 
-        QFile file(ProjectManager::instance()->importPath() + "/" + settings->destination());
+        QFile file(settings->absoluteDestination());
         if(file.open(QIODevice::WriteOnly)) {
             ByteArray data  = Bson::save( Engine::toVariant(&text) );
             file.write((const char *)&data[0], data.size());

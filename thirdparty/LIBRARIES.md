@@ -28,10 +28,26 @@
 - Version: 3.2
 - License: Zlib
 
+## glslang
+
+- Link: https://github.com/KhronosGroup/glslang
+- Version: 7.10.2984
+- License: Proprietary
+
+## libogg
+- Link: https://github.com/xiph/ogg
+- Version: 1.3.3
+- License: Ogg License (BSD-like)
+
+## libvorbis
+- Link: https://github.com/xiph/vorbis
+- Version: 1.3.6
+- License: Vorbis License (BSD-like)
+
 ## next
 
-- Link: N/A
-- Version: N/A
+- Link: https://github.com/eprikazchikov/platformnext
+- Version: 1.0
 - License: MIT
 
 ## physfs
@@ -51,6 +67,12 @@
 - Link: https://github.com/stachenov/quazip
 - Version: 0.7.3
 - License: LGPLv2.1
+
+## spirvcross
+
+- Link: https://github.com/KhronosGroup/SPIRV-Cross
+- Version: 2018-08-07
+- License: Apache 2.0
 
 ## Zlib
 

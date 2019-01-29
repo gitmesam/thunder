@@ -16,8 +16,10 @@ public:
 
     QVariant            editorData      (QWidget *editor);
 
+    QSize               sizeHint        (const QSize& size) const;
+
 protected slots:
-    void                onDataChanged   (const QString &data);
+    void                onDataChanged   ();
 
 };
 

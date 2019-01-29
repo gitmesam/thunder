@@ -4,10 +4,10 @@
 #include <engine.h>
 #include <file.h>
 
-#include "common.h"
+#include <global.h>
 #include "projectmanager.h"
 #include "assetmanager.h"
-#include "codemanager.h"
+#include "pluginmodel.h"
 
 #include "consolelog.h"
 
@@ -54,8 +54,8 @@ int main(int argc, char *argv[]) {
 
     Builder builder;
 
-    CodeManager::instance()->init();
-    AssetManager::instance()->init();
+    PluginModel::instance()->init(&engine);
+    AssetManager::instance()->init(&engine);
 
     return a.exec();
 }

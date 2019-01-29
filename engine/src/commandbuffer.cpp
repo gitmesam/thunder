@@ -1,23 +1,36 @@
 #include "commandbuffer.h"
 
-static ICommandBuffer *s_Handler    = nullptr;
-
-void ICommandBuffer::setHandler(ICommandBuffer *handler) {
-    if(s_Handler == nullptr) {
-        s_Handler   = handler;
-    }
-}
-
 void ICommandBuffer::clearRenderTarget(bool clearColor, const Vector4 &color, bool clearDepth, float depth) {
-    s_Handler->clearRenderTarget(clearColor, color, clearDepth, depth);
+     A_UNUSED(clearColor);
+     A_UNUSED(color);
+     A_UNUSED(clearDepth);
+     A_UNUSED(depth);
 }
 
 void ICommandBuffer::drawMesh(const Matrix4 &model, Mesh *mesh, uint32_t surface, uint8_t layer, MaterialInstance *material) {
-    s_Handler->drawMesh(model, mesh, surface, layer, material);
+    A_UNUSED(model);
+    A_UNUSED(mesh);
+    A_UNUSED(surface);
+    A_UNUSED(layer);
+    A_UNUSED(material);
 }
 
-void ICommandBuffer::setRenderTarget(uint8_t numberColors, const Texture *colors, const Texture *depth) {
-    s_Handler->setRenderTarget(numberColors, colors, depth);
+void ICommandBuffer::drawMeshInstanced(const Matrix4 *models, uint32_t count, Mesh *mesh, uint32_t surface, uint8_t layer, MaterialInstance *material, bool particle) {
+    A_UNUSED(models);
+    A_UNUSED(count);
+    A_UNUSED(mesh);
+    A_UNUSED(surface);
+    A_UNUSED(layer);
+    A_UNUSED(material);
+}
+
+void ICommandBuffer::setRenderTarget(const TargetBuffer &target, const RenderTexture *depth) {
+    A_UNUSED(target);
+    A_UNUSED(depth);
+}
+
+void ICommandBuffer::setRenderTarget(uint32_t target) {
+    A_UNUSED(target);
 }
 
 Vector4 ICommandBuffer::idToColor(uint32_t id) {
@@ -31,25 +44,48 @@ Vector4 ICommandBuffer::idToColor(uint32_t id) {
 }
 
 void ICommandBuffer::setColor(const Vector4 &color) {
-    s_Handler->setColor(color);
+    A_UNUSED(color);
+}
+
+void ICommandBuffer::setScreenProjection() {
+    setViewProjection(Matrix4(), Matrix4::ortho(-0.5f, 0.5f,-0.5f, 0.5f, 0.0f, 1.0f));
+}
+
+void ICommandBuffer::resetViewProjection() {
+
 }
 
 void ICommandBuffer::setViewProjection(const Matrix4 &view, const Matrix4 &projection) {
-    s_Handler->setViewProjection(view, projection);
+    A_UNUSED(view);
+    A_UNUSED(projection);
 }
 
 void ICommandBuffer::setGlobalValue(const char *name, const Variant &value) {
-    s_Handler->setGlobalValue(name, value);
+    A_UNUSED(name);
+    A_UNUSED(value);
+}
+
+void ICommandBuffer::setGlobalTexture(const char *name, const Texture *value) {
+    A_UNUSED(name);
+    A_UNUSED(value);
 }
 
 Matrix4 ICommandBuffer::projection() const {
-    return s_Handler->projection();
+    return Matrix4();
 }
 
 Matrix4 ICommandBuffer::modelView() const {
-    return s_Handler->modelView();
+    return Matrix4();
 }
 
-void ICommandBuffer::setViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
-    s_Handler->setViewport(x, y, width, height);
+const Texture *ICommandBuffer::texture(const char *name) const {
+    A_UNUSED(name);
+    return nullptr;
+}
+
+void ICommandBuffer::setViewport(int32_t x, int32_t y, int32_t width, int32_t height) {
+    A_UNUSED(x);
+    A_UNUSED(y);
+    A_UNUSED(width);
+    A_UNUSED(height);
 }

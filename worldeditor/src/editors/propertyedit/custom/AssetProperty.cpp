@@ -33,11 +33,10 @@ void TemplateProperty::setValue(const QVariant &value) {
 
 QWidget *TemplateProperty::createEditor(QWidget *parent, const QStyleOptionViewItem &) {
     ContentSelect *editor = new ContentSelect(parent);
-    int type    = Property::value(Qt::EditRole).value<Template>().type;
-    editor->setType( type );
+    editor->setType( Property::value(Qt::EditRole).value<Template>().type );
 
     m_Editor    = editor;
-    connect(m_Editor, SIGNAL(assetChanged(QString)), this, SLOT(onAssetChanged(QString)));
+    connect(m_Editor, SIGNAL(assetChanged(IConverterSettings *)), this, SLOT(onAssetChanged(IConverterSettings *)));
     return m_Editor;
 }
 
@@ -61,9 +60,9 @@ QVariant TemplateProperty::editorData(QWidget *editor) {
 }
 
 QSize TemplateProperty::sizeHint(const QSize& size) const {
-    return QSize(size.width(), 70);
+    return QSize(size.width(), 74);
 }
 
-void TemplateProperty::onAssetChanged(const QString &tpl) {
-    setValue(tpl);
+void TemplateProperty::onAssetChanged(IConverterSettings *settings) {
+    setValue(settings->destination());
 }

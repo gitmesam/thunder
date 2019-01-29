@@ -7,6 +7,9 @@
 #include <rendergl.h>
 
 #include <mutex>
+#include <string.h>
+
+#include "plugin.cpp"
 
 static string gAppConfig;
 static IFile *gFile = nullptr;
@@ -40,9 +43,12 @@ int main(int argc, char **argv) {
 
     gFile->fsearchPathAdd((engine.locationAppDir() + "/base.pak").c_str());
     engine.addModule(new RenderGL(&engine));
+    engine.addModule(new ${Project_Name}(&engine));
+
     if(engine.init() && engine.createWindow()) {
         engine.exec();
     }
+
     return 0;
 }
 

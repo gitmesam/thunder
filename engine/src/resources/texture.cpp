@@ -83,9 +83,12 @@ public:
 };
 
 Texture::Texture() :
+        m_Format(R8),
+        m_Compress(Uncompressed),
+        m_Type(Flat),
+        m_Filtering(None),
+        m_Wrap(Clamp),
         m_pRoot(nullptr) {
-    clear();
-
     setShape({ Vector2(0.0f), Vector2(0.0f, 1.0f), Vector2(1.0f), Vector2(1.0f, 0.0f) });
 }
 
@@ -115,7 +118,7 @@ void Texture::loadUserData(const VariantMap &data) {
 
             m_Type      = TextureType((*i).toInt());
             i++;
-            //Reserved
+            m_Compress  = CompressionType((*i).toInt());
             i++;
             m_Format    = FormatType((*i).toInt());
             i++;
@@ -159,11 +162,6 @@ void Texture::addSurface(const Surface &surface) {
 }
 
 void Texture::clear() {
-    m_Format    = LUMINANCE;
-    m_Type      = Flat;
-    m_Filtering = None;
-    m_Wrap      = Clamp;
-
     m_Width     = 1;
     m_Height    = 1;
 
@@ -179,6 +177,26 @@ void Texture::clear() {
         delete m_pRoot;
     }
     m_pRoot     = new Node;
+}
+
+void *Texture::nativeHandle() const {
+    return nullptr;
+}
+
+void Texture::readPixels(int32_t x, int32_t y, uint32_t width, uint32_t height) {
+    A_UNUSED(x)
+    A_UNUSED(y)
+    A_UNUSED(width)
+    A_UNUSED(height)
+}
+
+uint32_t Texture::getPixel(int32_t x, int32_t y) const {
+    uint32_t result = 0;
+    if(!m_Sides.empty() && !m_Sides[0].empty()) {
+        uint8_t *ptr    = m_Sides[0][0] + (y * m_Width + x);
+        memcpy(&result, ptr, sizeof(uint32_t));
+    }
+    return result;
 }
 
 uint32_t Texture::width() const {
@@ -205,7 +223,7 @@ uint32_t Texture::size(uint32_t width, uint32_t height) const {
 }
 
 inline uint32_t Texture::sizeDXTc(uint32_t width, uint32_t height) const {
-    return ((width + 3) / 4) * ((height + 3) / 4) * (m_Format == DXT1 ? 8 : 16);
+    return ((width + 3) / 4) * ((height + 3) / 4) * (m_Compress == DXT1 ? 8 : 16);
 }
 
 inline uint32_t Texture::sizeRGB(uint32_t width, uint32_t height) const {
@@ -266,8 +284,12 @@ void Texture::resize(uint32_t width, uint32_t height) {
     addSurface(s);
 }
 
+void Texture::setFormat(FormatType type) {
+    m_Format    = type;
+}
+
 bool Texture::isCompressed() const {
-    return (m_Format == DXT1 || m_Format == DXT5 || m_Format == ETC2);
+    return m_Compress != Uncompressed;
 }
 
 bool Texture::isCubemap() const {
@@ -276,8 +298,8 @@ bool Texture::isCubemap() const {
 
 uint8_t Texture::components() const {
     switch(m_Format) {
-        case LUMINANCE: return 1;
-        case RGB:       return 3;
+        case R8:    return 1;
+        case RGB8:  return 3;
         default: break;
     }
     return 4;

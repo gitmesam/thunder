@@ -1,5 +1,6 @@
 #include "projectmanager.h"
 
+#include <QUuid>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -11,13 +12,16 @@
 
 const QString gCompany("Company");
 const QString gQBS("QBS");
+const QString gProject("ProjectId");
+
+ProjectManager *ProjectManager::m_pInstance   = nullptr;
 
 ProjectManager::ProjectManager() {
     QDir dir(QCoreApplication::applicationDirPath());
     dir.cdUp();
     dir.cdUp();
     dir.cdUp();
-#if __APPLE__
+#if defined(__APPLE__)
     dir.cdUp();
     dir.cdUp();
     dir.cdUp();
@@ -25,10 +29,23 @@ ProjectManager::ProjectManager() {
 
     m_SDKPath       = QFileInfo(dir.absolutePath());
     m_ResourcePath  = QFileInfo(sdkPath() + "/resources");
+    m_TemplatePath  = QFileInfo(resourcePath() + "/editor/templates");
     m_QBSPath       = QFileInfo("qbs");
     m_QBSDefault    = m_QBSPath;
 
     m_MyProjectsPath    = QFileInfo(dir.absolutePath());
+}
+
+ProjectManager *ProjectManager::instance() {
+    if(!m_pInstance) {
+        m_pInstance = new ProjectManager;
+    }
+    return m_pInstance;
+}
+
+void ProjectManager::destroy() {
+    delete m_pInstance;
+    m_pInstance = nullptr;
 }
 
 void ProjectManager::init(const QString &project, const QString &target) {
@@ -73,7 +90,7 @@ void ProjectManager::loadSettings() {
         if(!doc.isNull()) {
             const QMetaObject *meta = metaObject();
             QJsonObject object      = doc.object();
-            foreach(const QString &it, doc.object().keys()) {
+            foreach(const QString &it, object.keys()) {
                 int index   = meta->indexOfProperty(qPrintable(it));
                 if(index > -1) {
                     QMetaProperty property  = meta->property(index);
@@ -85,10 +102,17 @@ void ProjectManager::loadSettings() {
                     property.write(this, value);
                 }
             }
-
             QJsonValue value    = object.value(gQBS);
             if(!value.isUndefined()) {
                 setQbsPath(value.toString());
+            }
+
+            QJsonObject::iterator it    = object.find(gProject);
+            if(it != doc.object().end()) {
+                m_ProjectId = it.value().toString();
+            } else {
+                m_ProjectId = QUuid::createUuid().toString();
+                saveSettings();
             }
         }
     }
@@ -110,9 +134,9 @@ void ProjectManager::saveSettings() {
             } else {
                 object[name] = QJsonValue(value.toString());
             }
-
         }
     }
+    object[gProject]    = QJsonValue(m_ProjectId);
 
     QString qbs = qbsPath();
     if(m_QBSDefault != qbs) {

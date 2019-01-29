@@ -3,15 +3,18 @@
 #include <commandbuffer.h>
 #include <components/camera.h>
 #include <components/actor.h>
+#include <components/transform.h>
 
 #include <resources/material.h>
 
 #include "handletools.h"
 
 #define SIDES 32
-#define ALPHA 0.3
+#define ALPHA 0.3f
 
-#define OVERRIDE "texture0"
+#define CONTROL_SIZE 90.0f
+
+#define OVERRIDE "uni.texture0"
 
 Vector4 Handles::s_Normal   = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 Vector4 Handles::s_Selected = Vector4(1.0f, 1.0f, 0.0f, 1.0f);
@@ -22,11 +25,10 @@ Vector4 Handles::s_zColor   = Vector4(0.0f, 0.0f, 1.0f, 1.0f);
 Vector4 Handles::s_Color    = Handles::s_Normal;
 Vector4 Handles::s_Second   = Handles::s_Normal;
 
-Vector3 Handles::m_sMouse   = Vector3();
+Vector2 Handles::m_sMouse   = Vector2();
+Vector2 Handles::m_sScreen  = Vector2();
 
-const Vector4 grey(0.3, 0.3, 0.3, 0.6);
-
-Camera *Handles::s_ActiveCamera = nullptr;
+const Vector4 grey(0.3f, 0.3f, 0.3f, 0.6f);
 
 uint8_t Handles::s_Axes     = 0;
 
@@ -39,6 +41,7 @@ float conesize  = length / 5.0f;
 Mesh *Handles::s_Cone   = nullptr;
 Mesh *Handles::s_Quad   = nullptr;
 Mesh *Handles::s_Move   = nullptr;
+Mesh *Handles::s_Lines  = nullptr;
 
 MaterialInstance *Handles::s_Gizmo  = nullptr;
 MaterialInstance *Handles::s_Sprite = nullptr;
@@ -73,6 +76,11 @@ void Handles::init() {
         if(m) {
             s_Gizmo = m->createInstance();
         }
+    }
+
+    if(s_Lines == nullptr) {
+        s_Lines = Engine::objectCreate<Mesh>("Lines");
+        s_Lines->makeDynamic();
     }
 
     if(s_Move == nullptr) {
@@ -140,17 +148,18 @@ void Handles::init() {
 
 void Handles::beginDraw(ICommandBuffer *buffer) {
     Matrix4 v, p;
-    s_ActiveCamera->matrices(v, p);
+    Camera::current()->matrices(v, p);
 
     HandleTools::setViewProjection(v, p);
 
     s_Buffer    = buffer;
+    s_Buffer->setColor(s_Normal);
     s_Buffer->setViewProjection(v, p);
     s_Buffer->clearRenderTarget(false, Vector4(), true, 1.0f);
 }
 
 void Handles::endDraw() {
-
+    s_Buffer->setColor(s_Normal);
 }
 
 void Handles::drawArrow(const Matrix4 &transform) {
@@ -164,7 +173,6 @@ void Handles::drawArrow(const Matrix4 &transform) {
 }
 
 void Handles::drawLines(const Matrix4 &transform, const Vector3Vector &points, const Mesh::IndexVector &indices) {
-    Mesh *lines = Engine::objectCreate<Mesh>("Lines");
 
     Mesh::Lod lod;
     lod.vertices    = points;
@@ -173,19 +181,39 @@ void Handles::drawLines(const Matrix4 &transform, const Vector3Vector &points, c
         Mesh::Surface surface;
         surface.mode    = Mesh::MODE_LINES;
         surface.lods.push_back(lod);
-        lines->addSurface(surface);
-        lines->apply();
+        s_Lines->setSurface(0, surface);
+        s_Lines->apply();
     }
     s_Buffer->setColor(s_Color);
-    s_Buffer->drawMesh(transform, lines, 0, ICommandBuffer::TRANSLUCENT, s_Gizmo);
+    s_Buffer->drawMesh(transform, s_Lines, 0, ICommandBuffer::TRANSLUCENT, s_Gizmo);
+}
 
-    delete lines;
+void Handles::drawAABB(AABBox &box) {
+    Vector3 min, max;
+    box.box(min, max);
+
+    Vector3Vector points = {
+        Vector3(min.x, min.y, min.z),
+        Vector3(max.x, min.y, min.z),
+        Vector3(max.x, min.y, max.z),
+        Vector3(min.x, min.y, max.z),
+
+        Vector3(min.x, max.y, min.z),
+        Vector3(max.x, max.y, min.z),
+        Vector3(max.x, max.y, max.z),
+        Vector3(min.x, max.y, max.z)
+    };
+    Mesh::IndexVector indices   = {0, 1, 1, 2, 2, 3, 3, 0,
+                                   4, 5, 5, 6, 6, 7, 7, 4,
+                                   0, 4, 1, 5, 2, 6, 3, 7};
+
+    drawLines(Matrix4(), points, indices);
 }
 
 bool Handles::drawBillboard(const Vector3 &position, const Vector2 &size, Texture *texture) {
     bool result = false;
     Matrix4 model(position, Quaternion(), Vector3(size, 1.0));
-    Matrix4 q   = model * Matrix4(Vector3(), s_ActiveCamera->actor().rotation(), Vector3(1.0));
+    Matrix4 q   = model * Matrix4(Vector3(), Camera::current()->actor()->transform()->rotation(), Vector3(1.0));
 
     if(HandleTools::distanceToPoint(q, Vector3()) <= sense) {
         result = true;
@@ -198,9 +226,18 @@ bool Handles::drawBillboard(const Vector3 &position, const Vector2 &size, Textur
 }
 
 Vector3 Handles::moveTool(const Vector3 &position, bool locked) {
-    Vector3 result    = position;
-    if(s_ActiveCamera) {
-        float scale   = (position - s_ActiveCamera->actor().position()).length() * cos(s_ActiveCamera->fov() * DEG2RAD) * 0.2f;
+    Vector3 result  = position;
+
+    Camera *camera  = Camera::current();
+    if(camera) {
+        Vector3 normal = position - camera->actor()->transform()->position();
+        float scale = 1.0f;
+        if(!camera->orthographic()) {
+            scale = normal.length() * (CONTROL_SIZE / m_sScreen.y);
+        } else {
+            scale = camera->orthoWidth() * (CONTROL_SIZE / m_sScreen.x);
+        }
+
         Matrix4 model(position, Quaternion(), scale);
 
         Matrix4 x   = model * Matrix4(Vector3(conesize, 0, 0), Quaternion(Vector3(0, 0, 1),-90) * Quaternion(Vector3(0, 1, 0),-90), conesize);
@@ -273,7 +310,7 @@ Vector3 Handles::moveTool(const Vector3 &position, bool locked) {
 
         Plane plane;
         plane.point     = position;
-        plane.normal    = s_ActiveCamera->actor().rotation() * Vector3(0.0, 0.0, 1.0);
+        plane.normal    = camera->actor()->transform()->rotation() * Vector3(0.0, 0.0, 1.0);
         if(s_Axes == AXIS_X || s_Axes == AXIS_Z) {
             plane.normal    = Vector3(0.0f, plane.normal.y, plane.normal.z);
         } else if(s_Axes == (AXIS_X | AXIS_Y)) {
@@ -281,12 +318,12 @@ Vector3 Handles::moveTool(const Vector3 &position, bool locked) {
         } else if(s_Axes == (AXIS_Z | AXIS_Y)) {
             plane.normal    = Vector3(1.0f, 0.0f, 0.0f);
         } else if(s_Axes == AXIS_Y || s_Axes == (AXIS_X | AXIS_Y | AXIS_Z)) {
-            plane.normal    = s_ActiveCamera->actor().rotation() * Vector3(0.0, 0.0, 1.0);
+            plane.normal    = camera->actor()->transform()->rotation() * Vector3(0.0, 0.0, 1.0);
             plane.normal    = Vector3(plane.normal.x, 0.0f, plane.normal.z);
         }
         plane.d = plane.normal.dot(plane.point);
 
-        Ray ray = s_ActiveCamera->castRay(m_sMouse.x, m_sMouse.y);
+        Ray ray = camera->castRay(m_sMouse.x, m_sMouse.y);
         Vector3 point;
         ray.intersect(plane, &point, true);
         if(s_Axes & AXIS_X) {
@@ -298,20 +335,28 @@ Vector3 Handles::moveTool(const Vector3 &position, bool locked) {
         if(s_Axes & AXIS_Z) {
             result.z    = point.z;
         }
+
     }
 
     return result;
 }
 
 Vector3 Handles::rotationTool(const Vector3 &position, bool locked) {
-    if(s_ActiveCamera) {
-        float scale     = ((position - s_ActiveCamera->actor().position()).length() * cos(s_ActiveCamera->fov() / 2 * DEG2RAD) * 0.2f);
-        Vector3 normal  = position - s_ActiveCamera->actor().position();
+    Camera *camera  = Camera::current();
+    if(camera) {
+        Transform *t = camera->actor()->transform();
+        Vector3 normal = position - t->position();
+        float scale = 1.0f;
+        if(!camera->orthographic()) {
+            scale = normal.length() * (CONTROL_SIZE / m_sScreen.y);
+        } else {
+            scale = camera->orthoWidth() * (CONTROL_SIZE / m_sScreen.x);
+        }
         normal.normalize();
 
         Matrix4 model(position, Quaternion(), scale);
 
-        Matrix4 q1  = model * Matrix4(Vector3(), s_ActiveCamera->actor().rotation() * Quaternion(Vector3( 90, 0, 0)), Vector3(conesize));
+        Matrix4 q1  = model * Matrix4(Vector3(), t->rotation() * Quaternion(Vector3( 90, 0, 0)), Vector3(conesize));
         Matrix4 q2  = q1 * Matrix4(Vector3(), Quaternion(Vector3( 0, 1, 0), 180), Vector3(1));
 
         Matrix4 x   = model * Matrix4(Vector3(), Quaternion(Vector3(0, 0, 90)) *
@@ -321,7 +366,7 @@ Vector3 Handles::rotationTool(const Vector3 &position, bool locked) {
                                                  Quaternion(Vector3(90, 0, 0)), Vector3(conesize));
 
         Matrix4 m;
-        m.scale(1.2);
+        m.scale(1.2f);
 
         if(!locked) {
             if((HandleTools::distanceToMesh(q1 * m, s_Move, CIRCLE) <= sense) ||
@@ -359,13 +404,19 @@ Vector3 Handles::rotationTool(const Vector3 &position, bool locked) {
         }
         s_Buffer->setColor(s_Normal);
     }
-    return m_sMouse * 100;
+    return Vector3(m_sMouse, 1.0) * 100;
 }
 
 Vector3 Handles::scaleTool(const Vector3 &position, bool locked) {
-    if(s_ActiveCamera) {
-        Vector3 normal  = position - s_ActiveCamera->actor().position();
-        float size      = normal.length() * cos(s_ActiveCamera->fov() / 2 * DEG2RAD) * 0.2;
+    Camera *camera  = Camera::current();
+    if(camera) {
+        Vector3 normal = position - camera->actor()->transform()->position();
+        float size = 1.0f;
+        if(!camera->orthographic()) {
+            size = normal.length() * (CONTROL_SIZE / m_sScreen.y);
+        } else {
+            size = camera->orthoWidth() * (CONTROL_SIZE / m_sScreen.x);
+        }
 
         Vector3 scale(((normal.x < 0) ? 1 : -1) * size,
                       ((normal.y < 0) ? 1 : -1) * size,
@@ -475,7 +526,7 @@ Vector3 Handles::scaleTool(const Vector3 &position, bool locked) {
         s_Color = s_Normal;
     }
 
-    return m_sMouse * 100;
+    return Vector3(m_sMouse, 1.0) * 100;
 }
 
 

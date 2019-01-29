@@ -8,7 +8,7 @@
 class Node;
 
 class NEXT_LIBRARY_EXPORT Texture : public Object {
-    A_REGISTER(Texture, Object, Resources);
+    A_REGISTER(Texture, Object, Resources)
 
 public:
     enum TextureType {
@@ -17,9 +17,16 @@ public:
     };
 
     enum FormatType {
-        LUMINANCE,
-        RGB,
-        RGBA,
+        R8,
+        RGB8,
+        RGBA8,
+        RGB10A2,
+        R11G11B10Float,
+        Depth
+    };
+
+    enum CompressionType {
+        Uncompressed,
         DXT1,
         DXT5,
         ETC2
@@ -50,6 +57,12 @@ public:
     virtual void                apply                       ();
     virtual void                clear                       ();
 
+    virtual void               *nativeHandle                () const;
+
+    virtual void                readPixels                  (int32_t x, int32_t y, uint32_t width, uint32_t height);
+
+    uint32_t                    getPixel                    (int32_t x, int32_t y) const;
+
     uint32_t                    width                       () const;
     uint32_t                    height                      () const;
 
@@ -70,6 +83,8 @@ public:
 
     void                        resize                      (uint32_t width, uint32_t height);
 
+    void                        setFormat                   (FormatType type);
+
 protected:
     uint32_t                    size                        (uint32_t width, uint32_t height) const;
     uint32_t                    sizeDXTc                    (uint32_t width, uint32_t height) const;
@@ -78,6 +93,7 @@ protected:
     uint8_t                     components                  () const;
 
     FormatType                  m_Format;
+    CompressionType             m_Compress;
     TextureType                 m_Type;
     FilteringType               m_Filtering;
     WrapType                    m_Wrap;

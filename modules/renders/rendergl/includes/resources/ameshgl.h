@@ -6,6 +6,8 @@
 #include <resources/mesh.h>
 #include <amath.h>
 
+class CommandBufferGL;
+
 class AMeshGL : public Mesh {
     A_OVERRIDE(AMeshGL, Mesh, Resources)
 public:
@@ -32,7 +34,6 @@ public:
     BufferVector                m_colors;
     BufferVector                m_weights;
     BufferVector                m_indices;
-
 };
 
 #endif // MESHGL_H

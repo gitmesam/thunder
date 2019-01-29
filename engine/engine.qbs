@@ -15,31 +15,39 @@ Project {
     ]
 
     property stringList incPaths: [
-        "includes",
-        "includes/resources",
-        "../common",
         "../thirdparty/next/inc",
         "../thirdparty/next/inc/math",
         "../thirdparty/next/inc/core",
+        "../thirdparty/next/inc/anim",
         "../thirdparty/physfs/src",
         "../thirdparty/glfw/include",
         "../thirdparty/glfm/include",
-        "../thirdparty/freetype/include"
+        "../thirdparty/freetype/include",
+        "includes/components",
+        "includes/resources",
+        "includes"
     ]
 
     DynamicLibrary {
         name: "engine-editor"
         condition: engine.desktop
-        files: engine.srcFiles
+        files:
+        {
+            var sources = srcFiles
+            sources.push("src/converters/*.cpp")
+            sources.push("includes/converters/*.h")
+            return sources
+        }
         Depends { name: "cpp" }
         Depends { name: "next-editor" }
         Depends { name: "glfw-editor" }
         Depends { name: "zlib-editor" }
         Depends { name: "physfs-editor" }
         Depends { name: "freetype-editor" }
+        Depends { name: "Qt"; submodules: ["core", "gui"]; }
         bundle.isBundle: false
 
-        cpp.defines: ["BUILD_SHARED", "NEXT_LIBRARY"]
+        cpp.defines: ["NEXT_SHARED", "NEXT_LIBRARY"]
         cpp.includePaths: engine.incPaths
         cpp.libraryPaths: [ ]
         cpp.dynamicLibraries: [ ]
@@ -76,6 +84,7 @@ Project {
         name: "engine"
         files: engine.srcFiles
         Depends { name: "cpp" }
+        Depends { name: "next" }
         bundle.isBundle: false
 
         cpp.includePaths: engine.incPaths

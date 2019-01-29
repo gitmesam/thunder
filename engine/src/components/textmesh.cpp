@@ -1,5 +1,6 @@
 #include "components/textmesh.h"
 #include "components/actor.h"
+#include "components/transform.h"
 
 #include "resources/mesh.h"
 
@@ -8,6 +9,8 @@
 
 #define FONT  "Font"
 
+#define OVERRIDE "uni.texture0"
+
 TextMesh::TextMesh() :
         m_pFont(nullptr),
         m_Size(16),
@@ -15,25 +18,12 @@ TextMesh::TextMesh() :
         m_Line(0),
         m_Color(1.0f) {
     m_pMesh = Engine::objectCreate<Mesh>();
+    m_pMesh->makeDynamic();
     m_pMesh->setFlags(Mesh::ATTRIBUTE_UV0);
 
     Material *material  = Engine::loadResource<Material>(".embedded/DefaultFont.mtl");
     if(material) {
-        m_pMaterial = material->createInstance();
-    }
-}
-
-void TextMesh::draw(ICommandBuffer &buffer, int8_t layer) {
-    Actor &a    = actor();
-    if(m_pMesh && layer & (ICommandBuffer::RAYCAST | ICommandBuffer::DEFAULT | ICommandBuffer::TRANSLUCENT | ICommandBuffer::SHADOWCAST)) {
-        if(layer & ICommandBuffer::RAYCAST) {
-            buffer.setColor(ICommandBuffer::idToColor(a.uuid()));
-        }
-
-        for(uint32_t s = 0; s < m_pMesh->surfacesCount(); s++) {
-            buffer.drawMesh(a.worldTransform(), m_pMesh, s, layer, m_pMaterial);
-        }
-        buffer.setColor(Vector4(1.0f));
+        m_Materials.push_back(material->createInstance());
     }
 }
 
@@ -42,7 +32,7 @@ void TextMesh::composeMesh() {
         m_Space = m_pFont->spaceWidth(m_Size);
         m_Line  = m_pFont->lineHeight(m_Size);
 
-        m_pMesh->clear();
+        //m_pMesh->clear();
 
         u32string text  = Utils::utf8ToUtf32(m_Text);
         m_pFont->requestCharacters(text, m_Size);
@@ -91,10 +81,22 @@ void TextMesh::composeMesh() {
                 }
             }
 
+            Vector3 bb[2];
+            for(uint32_t i = 0; i < lod.vertices.size(); i++) {
+                bb[0].x = MIN(bb[0].x, lod.vertices[i].x);
+                bb[0].y = MIN(bb[0].y, lod.vertices[i].y);
+                bb[0].z = MIN(bb[0].z, lod.vertices[i].z);
+
+                bb[1].x = MAX(bb[1].x, lod.vertices[i].x);
+                bb[1].y = MAX(bb[1].y, lod.vertices[i].y);
+                bb[1].z = MAX(bb[1].z, lod.vertices[i].z);
+            }
+
             Mesh::Surface surface;
             surface.mode    = Mesh::MODE_TRIANGLES;
             surface.lods.push_back(lod);
-            m_pMesh->addSurface(surface);
+            surface.aabb.setBox(bb[0], bb[1]);
+            m_pMesh->setSurface(0, surface);
             m_pMesh->apply();
         }
     }
@@ -115,17 +117,17 @@ Font *TextMesh::font() const {
 
 void TextMesh::setFont(Font *font) {
     m_pFont = font;
-    if(m_pFont) {
-        m_pMaterial->setTexture("texture0", m_pFont->texture());
+    if(m_pFont && !m_Materials.empty()) {
+        m_Materials[0]->setTexture(OVERRIDE, m_pFont->texture());
     }
     composeMesh();
 }
 
-int TextMesh::size() const {
+int TextMesh::fontSize() const {
     return m_Size;
 }
 
-void TextMesh::setSize(int size) {
+void TextMesh::setFontSize(int size) {
     m_Size  = size;
     composeMesh();
 }
@@ -136,8 +138,8 @@ Vector4 TextMesh::color() const {
 
 void TextMesh::setColor(const Vector4 &color) {
     m_Color = color;
-    if(m_pMaterial) {
-        m_pMaterial->setVector4("color0", &m_Color);
+    if(!m_Materials.empty()) {
+        m_Materials[0]->setVector4("uni.color0", &m_Color);
     }
 }
 

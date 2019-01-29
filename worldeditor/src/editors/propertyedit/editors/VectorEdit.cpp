@@ -1,55 +1,55 @@
 #include "VectorEdit.h"
+#include "ui_VectorEdit.h"
 
-#include <QHBoxLayout>
+#include <QDoubleValidator>
+#include <QLocale>
 
-#include <amath.h>
 #include <float.h>
 
 Q_DECLARE_METATYPE(Vector3)
 
 VectorEdit::VectorEdit(QWidget *parent) :
-        QWidget(parent) {
+        QWidget(parent),
+        ui(new Ui::VectorEdit) {
 
-    QHBoxLayout *layout = new QHBoxLayout(this);
-    layout->setMargin(0);
-    layout->setSpacing(1);
+    ui->setupUi(this);
 
-    m_pSpinX    = new QDoubleSpinBox(this);
-    m_pSpinY    = new QDoubleSpinBox(this);
-    m_pSpinZ    = new QDoubleSpinBox(this);
-    connect(m_pSpinX, SIGNAL(valueChanged(double)), this, SLOT(onValueChanged(double)));
-    connect(m_pSpinY, SIGNAL(valueChanged(double)), this, SLOT(onValueChanged(double)));
-    connect(m_pSpinZ, SIGNAL(valueChanged(double)), this, SLOT(onValueChanged(double)));
+    QDoubleValidator *validator = new QDoubleValidator(-DBL_MAX, DBL_MAX, 4, this);
 
-    m_pSpinX->setRange(-DBL_MAX, DBL_MAX);
-    m_pSpinY->setRange(-DBL_MAX, DBL_MAX);
-    m_pSpinZ->setRange(-DBL_MAX, DBL_MAX);
+    ui->x->setValidator(validator);
+    ui->y->setValidator(validator);
+    ui->z->setValidator(validator);
 
-    layout->addWidget(m_pSpinX);
-    layout->addWidget(m_pSpinY);
-    layout->addWidget(m_pSpinZ);
+    connect(ui->x, SIGNAL(editingFinished()), this, SLOT(onValueChanged()));
+    connect(ui->y, SIGNAL(editingFinished()), this, SLOT(onValueChanged()));
+    connect(ui->z, SIGNAL(editingFinished()), this, SLOT(onValueChanged()));
+}
 
-    setLayout(layout);
+VectorEdit::~VectorEdit() {
+    delete ui;
 }
 
 Vector3 VectorEdit::data() const {
-    return Vector3(m_pSpinX->value(), m_pSpinY->value(), m_pSpinZ->value());
+    QLocale locale;
+    return Vector3(locale.toFloat(ui->x->text()),
+                   locale.toFloat(ui->y->text()),
+                   locale.toFloat(ui->z->text()));
 }
 
 void VectorEdit::setData(const Vector3 &v) {
-    m_pSpinX->blockSignals(true);
-    m_pSpinX->setValue(v.x);
-    m_pSpinX->blockSignals(false);
+    ui->x->blockSignals(true);
+    ui->x->setText(QString::number(v.x, 'f', 3));
+    ui->x->blockSignals(false);
 
-    m_pSpinY->blockSignals(true);
-    m_pSpinY->setValue(v.y);
-    m_pSpinY->blockSignals(false);
+    ui->y->blockSignals(true);
+    ui->y->setText(QString::number(v.y, 'f', 3));
+    ui->y->blockSignals(false);
 
-    m_pSpinZ->blockSignals(true);
-    m_pSpinZ->setValue(v.z);
-    m_pSpinZ->blockSignals(false);
+    ui->z->blockSignals(true);
+    ui->z->setText(QString::number(v.z, 'f', 3));
+    ui->z->blockSignals(false);
 }
 
-void VectorEdit::onValueChanged(double) {
+void VectorEdit::onValueChanged() {
     emit dataChanged(QVariant::fromValue(data()));
 }

@@ -1,31 +1,59 @@
 #include "components/directlight.h"
 
+#include "components/actor.h"
+#include "components/transform.h"
+
+#include "commandbuffer.h"
+
+#include "resources/material.h"
+#include "resources/mesh.h"
+
+#define MAX_LODS 4
+
 DirectLight::DirectLight() {
-    m_Shadows       = false;
-    m_Brightness    = 1.0f;
-    m_Bias          = 0.001f;
-    m_Color         = Vector4(1.0f);
+    m_pShape        = Engine::loadResource<Mesh>(".embedded/plane.fbx");
+
+    Material *material  = Engine::loadResource<Material>(".embedded/DirectLight.mtl");
+    m_pMaterialInstance = material->createInstance();
+
+    m_pMaterialInstance->setVector4("light.color",      &m_Color);
+    m_pMaterialInstance->setFloat("light.brightness",   &m_Brightness);
+    m_pMaterialInstance->setFloat("light.shadows",      &m_Shadows);
+    m_pMaterialInstance->setFloat("light.bias",         &m_Bias);
+
+    m_pMaterialInstance->setVector4("light.lod",        &m_NormalizedDistance);
+    m_pMaterialInstance->setVector4("light.position",   &m_Direction);
+
+    m_pMatrix       = new Matrix4[MAX_LODS];
+    m_pTiles        = new Vector4[MAX_LODS];
+
+    m_pMaterialInstance->setMatrix4("light.matrix",     m_pMatrix, MAX_LODS);
+    m_pMaterialInstance->setVector4("light.tiles",      m_pTiles,  MAX_LODS);
 }
 
-bool DirectLight::castShadows() const {
-    return (m_Shadows == 1.0f);
+DirectLight::~DirectLight() {
+    delete m_pMatrix;
+    delete m_pTiles;
 }
 
-void DirectLight::setCastShadows(bool shadows) {
-    m_Shadows   = (shadows) ? 1.0f : 0.0f;
+void DirectLight::draw(ICommandBuffer &buffer, int8_t layer) {
+    if(m_pShape && m_pMaterialInstance && (layer & ICommandBuffer::LIGHT)) {
+        m_Direction = Vector4(actor()->transform()->rotation() * Vector3(0.0f, 0.0f, 1.0f), 0.0);
+
+        buffer.setScreenProjection();
+        buffer.drawMesh(Matrix4(), m_pShape, 0, layer, m_pMaterialInstance);
+        buffer.resetViewProjection();
+    }
 }
 
-float DirectLight::brightness() const {
-    return m_Brightness;
+Vector4 &DirectLight::normalizedDistance() {
+    return m_NormalizedDistance;
 }
 
-void DirectLight::setBrightness(const float brightness) {
-    m_Brightness= brightness;
+Vector4 *DirectLight::tiles() {
+    return m_pTiles;
 }
 
-Vector4 DirectLight::color() const {
-    return m_Color;
-}
-void DirectLight::setColor(const Vector4 &color) {
-    m_Color = color;
+Matrix4 *DirectLight::matrix() {
+    return m_pMatrix;
 }

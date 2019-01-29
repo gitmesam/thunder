@@ -8,10 +8,12 @@ ${Includes}
 class ${Project_Name} : public IModule {
 public:
     ${Project_Name}             (Engine *engine) {
+        ObjectSystem system;
         ${RegisterComponents}
     }
 
     ~${Project_Name}            () {
+        ObjectSystem system;
         ${UnregisterComponents}
     }
 
@@ -33,10 +35,11 @@ public:
         return result;
     }
 };
-
+#ifdef NEXT_SHARED
 extern "C" {
-    NEXT_LIBRARY_EXPORT IModule *moduleCreate(Engine *engine) {
+    MODULE_EXPORT IModule *moduleCreate(Engine *engine) {
         return new ${Project_Name}(engine);
     }
 }
+#endif
 #endif // PLUGINTEMPLATE_H

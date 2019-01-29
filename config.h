@@ -11,6 +11,7 @@ const QString gIcons("thumbnails");
 const QString gGenerated("generated");
 const QString gPlugins("plugins");
 const QString gType("type");
+const QString gSubItems("subitems");
 const QString gSettings("settings");
 
 const QString gProjectExt(".forge");
@@ -31,6 +32,7 @@ const QString gStatic(".a");
 const QString gApplication("");
 #endif
 const QString gMimeContent("text/content");
+const QString gMimeObject("text/object");
 
 const QString gDefaultFont("Helvetica Neue");
 

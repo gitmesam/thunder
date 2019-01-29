@@ -29,7 +29,9 @@ public:
     ObjectPrivate() :
         m_pParent(nullptr),
         m_pCurrentSender(nullptr),
-        m_UUID(0) {
+        m_UUID(0),
+        m_Cloned(0),
+        m_pSystem(nullptr) {
 
     }
 
@@ -57,9 +59,11 @@ public:
     EventQueue                      m_EventQueue;
 
     uint32_t                        m_UUID;
+    uint32_t                        m_Cloned;
 
     mutex                           m_Mutex;
 
+    ObjectSystem                   *m_pSystem;
 };
 /*!
     \class Object
@@ -67,7 +71,7 @@ public:
     \since Next 1.0
     \inmodule Core
 
-    The object is the central part of the library Next.
+    The object is the central part of the Next library.
     For communication between objects two mechanisms was implemented the signals and slots also event based approach.
     To connect two objects between use connect() method and the sender object  will notify the receiver object about necessary events.
 
@@ -106,13 +110,34 @@ public:
     \sa find(), findChildren()
 */
 /*!
+    \macro A_OBJECT(Class, Super)
+    \relates Object
+
+    This macro creates member functions to create MetaObject's.
+
+    \a Class must be current class name
+    \a Super must be class name of parent
+
+    Example:
+    \code
+        class MyObject : public Object {
+            A_OBJECT(MyObject, Object)
+        };
+    \endcode
+
+    And then:
+    \code
+        MetaObject *meta    = MyObject::metaClass();
+    \endcode
+*/
+/*!
     \macro A_REGISTER(Class, Super, Group)
     \relates Object
 
-    This macro create member functions for registering and unregistering in ObjectSystem factory.
+    This macro creates member functions for registering and unregistering in ObjectSystem factory.
 
     \a Class must be current class name
-    \a Super must be class name of parrent
+    \a Super must be class name of parent
     \a Group could be any and used to help manage factories
 
     Example:
@@ -138,14 +163,14 @@ public:
     \macro A_OVERRIDE(Class, Super, Group)
     \relates Object
 
-    This macro work pertty mutch the same as A_REGISTER() macro but with little difference.
+    This macro works pertty mutch the same as A_REGISTER() macro but with little difference.
     It's override \a Super factory in ObjectSystem by own routine.
     And restore original state when do unregisterClassFactory().
 
     This macro can be used to implement polymorphic behavior for factories.
 
     \a Class must be current class name
-    \a Super must be class name of parrent
+    \a Super must be class name of parent
     \a Group could be any and used to help manage factories
 
     Example:
@@ -167,12 +192,67 @@ public:
         }
     \endcode
 
-    \note Also it's includes A_OBJECT() macro
+    \note Also it's includes A_OBJECT macro
 
-    \sa ObjectSystem::objectCreate(), A_REGISTER(), A_OBJECT()
+    \sa ObjectSystem::objectCreate(), A_REGISTER(), A_OBJECT
 */
 /*!
-    Cunstructs an object.
+    \macro A_METHODS()
+    \relates Object
+
+    This macro is a container to keep information about included methods.
+
+    There are three possible types of methods:
+    \table
+    \header
+        \li Type
+        \li Description
+    \row
+        \li A_SIGNAL
+        \li Method without impelementation can't be invoked. Used for Signals and Slots mechanism.
+    \row
+        \li A_METHOD
+        \li Standard method can be invoked. Used for general porposes.
+    \row
+        \li A_SLOT
+        \li Very similar to A_METHOD but with special flag to be used for Signal-Slot mechanism.
+    \endtable
+
+
+    For example declare an introspectable class.
+    \code
+        class MyObject : public Object {
+            A_REGISTER(MyObject, Object, General)
+
+            A_METHODS(
+                A_METHOD(foo)
+                A_SIGNAL(signal)
+            )
+
+        public:
+            void            foo             () { }
+
+            void            signal          ();
+        };
+    \endcode
+
+    And then:
+    \code
+        MyObject obj;
+        const MetaObject *meta = obj.metaObject();
+
+        int index   = meta->indexOfMethod("foo");
+        if(index > -1) {
+            MetaMethod method   = meta->method(index);
+            if(method.isValid() {
+                Variant value;
+                method.invoke(&obj, value, 0, nullptr); // Will call MyObject::foo method
+            }
+        }
+    \endcode
+*/
+/*!
+    Constructs an object.
 
     By default Object create without parent to assign the parent object use setParent().
 */
@@ -184,6 +264,11 @@ Object::Object() :
 
 Object::~Object() {
     PROFILE_FUNCTION()
+
+    if(p_ptr->m_pSystem) {
+        p_ptr->m_pSystem->removeObject(this);
+    }
+
     {
         unique_lock<mutex> locker(p_ptr->m_Mutex);
         while(!p_ptr->m_EventQueue.empty()) {
@@ -244,7 +329,7 @@ const MetaObject *Object::metaObject() const {
     return Object::metaClass();
 }
 /*!
-    Clones this object.
+    Clones this object and set \a parent for the clone.
     Returns pointer to clone object.
 
     When you clone the Object or subclasses of it, all child objects also will be cloned.
@@ -254,10 +339,11 @@ const MetaObject *Object::metaObject() const {
 
     \sa connect()
 */
-Object *Object::clone() {
+Object *Object::clone(Object *parent) {
     PROFILE_FUNCTION()
     const MetaObject *meta  = metaObject();
     Object *result = meta->createInstance();
+    result->setParent(parent);
     int count  = meta->propertyCount();
     for(int i = 0; i < count; i++) {
         MetaProperty lp = result->metaObject()->property(i);
@@ -265,9 +351,8 @@ Object *Object::clone() {
         lp.write(result, rp.read(this));
     }
     for(auto it : getChildren()) {
-        Object *clone  = it->clone();
+        Object *clone  = it->clone(result);
         clone->setName(it->name());
-        clone->setParent(result);
     }
     for(auto it : p_ptr->m_lSenders) {
         MetaMethod signal  = it.sender->metaObject()->method(it.signal);
@@ -281,8 +366,16 @@ Object *Object::clone() {
         connect(result, (to_string(1) + signal.signature()).c_str(),
                 it.receiver, (to_string((method.type() == MetaMethod::Signal) ? 1 : 2) + method.signature()).c_str());
     }
-    result->p_ptr->m_UUID   = ObjectSystem::generateUUID(result);
+    result->p_ptr->m_Cloned = p_ptr->m_UUID;
+    result->p_ptr->m_UUID   = ObjectSystem::generateUID();
     return result;
+}
+/*!
+    Returns the UUID of cloned object.
+*/
+uint32_t Object::clonedFrom() const {
+    PROFILE_FUNCTION()
+    return p_ptr->m_Cloned;
 }
 /*!
     Returns a pointer to the parent object.
@@ -349,7 +442,7 @@ string Object::typeName() const {
         Object::connect(&obj1, _SIGNAL(signal(bool)), &obj2, _SIGNAL(signal(bool)));
     \endcode
 */
-void Object::connect(Object *sender, const char *signal, Object *receiver, const char *method) {
+bool Object::connect(Object *sender, const char *signal, Object *receiver, const char *method) {
     PROFILE_FUNCTION()
     if(sender && receiver) {
         int32_t snd = sender->metaObject()->indexOfSignal(&signal[1]);
@@ -379,9 +472,11 @@ void Object::connect(Object *sender, const char *signal, Object *receiver, const
                     unique_lock<mutex> locker(receiver->p_ptr->m_Mutex);
                     receiver->p_ptr->m_lSenders.push_back(link);
                 }
+                return true;
             }
         }
     }
+    return false;
 }
 /*!
     Disconnects \a signal in object \a sender from \a method in object \a receiver.
@@ -620,7 +715,12 @@ bool Object::event(Event *event) {
     A_UNUSED(event);
     return false;
 }
-
+/*!
+    This method allows to DESERIALIZE \a data of object like properties, connections and user data.
+*/
+void Object::loadData(const VariantList &data) {
+    A_UNUSED(data)
+}
 /*!
     This method allows to DESERIALIZE \a data which not present as A_PROPERTY() in object.
 */
@@ -628,11 +728,67 @@ void Object::loadUserData(const VariantMap &data) {
     A_UNUSED(data)
 }
 /*!
+    This method allows to SERIALIZE all object data like properties connections and user data.
+    Returns serialized data as VariantList.
+*/
+VariantList Object::saveData() const {
+    VariantList result;
+
+    result.push_back(typeName());
+    result.push_back((int32_t)p_ptr->m_UUID);
+    Object *parent = p_ptr->m_pParent;
+    result.push_back(int((parent) ? parent->uuid() : 0));
+    result.push_back(name());
+
+    // Save base properties
+    VariantMap properties;
+    const MetaObject *meta = metaObject();
+    for(int i = 0; i < meta->propertyCount(); i++) {
+        MetaProperty p = meta->property(i);
+        if(p.isValid()) {
+            Variant v  = p.read(this);
+            if(v.userType() < MetaType::USERTYPE) {
+                properties[p.name()] = v;
+            }
+        }
+    }
+
+    // Save links
+    VariantList links;
+    for(const auto &l : getReceivers()) {
+        VariantList link;
+
+        Object *sender  = l.sender;
+
+        link.push_back(int(sender->uuid()));
+        MetaMethod method  = sender->metaObject()->method(l.signal);
+        link.push_back(Variant(char(method.type() + 0x30) + method.signature()));
+
+        link.push_back((int32_t)p_ptr->m_UUID);
+        method      = metaObject()->method(l.method);
+        link.push_back(Variant(char(method.type() + 0x30) + method.signature()));
+
+        links.push_back(link);
+    }
+    result.push_back(properties);
+    result.push_back(links);
+    result.push_back(saveUserData());
+
+    return result;
+}
+
+/*!
     This method allows to SERIALIZE data which not present as A_PROPERTY() in object.
-    Returns sizlized data as VariantMap.
+    Returns serialized data as VariantMap.
 */
 VariantMap Object::saveUserData() const {
     return VariantMap();
+}
+/*!
+    Returns true if the object can be serialized; otherwise returns false.
+*/
+bool Object::isSerializable() const {
+    return true;
 }
 /*!
     Returns the value of the object's property by \a name.
@@ -682,11 +838,7 @@ void Object::setUUID(uint32_t id) {
     p_ptr->m_UUID   = id;
 }
 
-Object &Object::operator=(Object &right) {
+void Object::setSystem(ObjectSystem *system) {
     PROFILE_FUNCTION()
-    return *new Object(right);
-}
-
-Object::Object(const Object &) {
-    PROFILE_FUNCTION()
+    p_ptr->m_pSystem = system;
 }

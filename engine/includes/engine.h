@@ -5,15 +5,17 @@
 #include <string>
 #include <map>
 
-#include <object.h>
+#include "object.h"
 #include <objectsystem.h>
 
-class IFile;
+#include <file.h>
 
 class IModule;
-class IController;
 
 class EnginePrivate;
+
+class Actor;
+class Scene;
 
 class NEXT_LIBRARY_EXPORT Engine : public ObjectSystem {
 public:
@@ -34,7 +36,9 @@ public:
 /*
     Resource management
 */
-    static Object              *loadResource                (const string &path = string());
+    static Object              *loadResource                (const string &path);
+
+    static void                 unloadResource              (const string &path);
 
     template<typename T>
     static T                   *loadResource                (const string &path) {
@@ -51,13 +55,9 @@ public:
 
     bool                        createWindow                ();
 
-    IController                *controller                  ();
-    /*!
-        Get FileIO object.
+    Scene                      *scene                       ();
 
-        @return                 Pointer to file system object.
-    */
-    IFile                      *file                        ();
+    static IFile               *file                        ();
 
     static string               locationAppDir              ();
 
@@ -72,6 +72,10 @@ public:
     string                      organizationName            () const;
 
     void                        setOrganizationName         (const string &name);
+
+    static void                 updateScene                 (Object *object);
+
+    static void                 setResource                 (Object *object, string &uuid);
 
 private:
     EnginePrivate              *p_ptr;

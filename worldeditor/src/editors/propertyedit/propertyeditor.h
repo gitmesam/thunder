@@ -18,11 +18,11 @@ class PropertyEditor : public QWidget {
 public:
     typedef Property* (*UserTypeCB)(const QString &name, QObject *propertyObject, Property *parent);
 
-    explicit PropertyEditor (QWidget *parent = 0);
+    explicit PropertyEditor (QWidget *parent = nullptr);
 
     virtual ~PropertyEditor ();
 
-    void                    addObject                   (QObject *propertyObject, const QString &name = QString(), QObject *parent = 0);
+    void                    addObject                   (QObject *propertyObject, const QString &name = QString(), QObject *parent = nullptr);
 
     void                    setObject                   (QObject *propertyObject);
 
@@ -30,8 +30,13 @@ public:
 
     void                    unregisterCustomPropertyCB  (UserTypeCB callback);
 
+signals:
+    void                    insertKeyframe              (QString &property);
+
 public slots:
     void                    onUpdated                   ();
+
+    void                    onAnimated                  (bool flag);
 
     void                    clear                       ();
 
@@ -41,10 +46,16 @@ protected:
 private slots:
     void                    on_lineEdit_textChanged     (const QString &arg1);
 
+    void                    on_treeView_customContextMenuRequested  (const QPoint &pos);
+
+    void                    onInsertKeyframe            ();
+
 private:
     Ui::PropertyEditor     *ui;
 
     PropertyFilter         *m_pFilter;
+
+    bool                    m_Animated;
 };
 
 #endif

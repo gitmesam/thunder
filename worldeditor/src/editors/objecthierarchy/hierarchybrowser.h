@@ -10,8 +10,6 @@ namespace Ui {
     class HierarchyBrowser;
 }
 
-const QString gMimeObject("text/object");
-
 class TreeView : public QTreeView {
     Q_OBJECT
 
@@ -77,7 +75,7 @@ signals:
     void                    updated                     ();
 
 public slots:
-    void                    onSelected                  (Object::ObjectList objects);
+    void                    onObjectSelected            (Object::ObjectList objects);
 
     void                    onHierarchyUpdated          ();
 

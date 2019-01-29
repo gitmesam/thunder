@@ -16,7 +16,8 @@ Project {
     property stringList incPaths: [
         "inc",
         "inc/core",
-        "inc/math"
+        "inc/math",
+        "inc/anim"
     ]
 
     DynamicLibrary {
@@ -26,14 +27,18 @@ Project {
         Depends { name: "cpp" }
         bundle.isBundle: false
 
-        cpp.defines: ["BUILD_SHARED", "NEXT_LIBRARY"]
+        cpp.defines: ["NEXT_SHARED", "NEXT_LIBRARY"]
         cpp.includePaths: next.incPaths
         cpp.libraryPaths: [ ]
         cpp.dynamicLibraries: [ ]
         cpp.cxxLanguageVersion: "c++14"
         cpp.minimumMacosVersion: "10.12"
         cpp.cxxStandardLibrary: "libc++"
-        cpp.sonamePrefix: "@executable_path"
+
+        Properties {
+            condition: qbs.targetOS.contains("darwin")
+            cpp.sonamePrefix: "@executable_path"
+        }
 
         Group {
             name: "Install Dynamic Platform"

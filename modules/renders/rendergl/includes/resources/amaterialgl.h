@@ -1,7 +1,7 @@
 #ifndef MATERIALGL_H
 #define MATERIALGL_H
 
-#include <map>
+#include <unordered_map>
 #include <list>
 
 #include <resources/material.h>
@@ -9,55 +9,50 @@
 #include <engine.h>
 
 class ATextureGL;
-class CommandBufferGL;
+class ICommandBuffer;
 
 class AMaterialGL : public Material {
     A_OVERRIDE(AMaterialGL, Material, Resources)
 
-    /*! \enum ShaderType */
     enum ShaderType {
-        Vertex                  = (1<<0),
-        Fragment                = (1<<1),
-        Geometry                = (1<<2),
-        TesselationControll     = (1<<3),
-        TesselationEvaluation   = (1<<4)
+        Static      = 0,
+        Instanced,
+        Skinned,
+        Particle,
+
+        Default     = 20,
+        Simple
     };
 
-    enum FragmentMode {
-        Simple                  = (1<<8),
-        Depth                   = (1<<9)
-    };
+    typedef unordered_map<uint16_t, uint32_t> ObjectMap;
 
 public:
-    AMaterialGL                 ();
     ~AMaterialGL                ();
+
+    void                        clear           ();
 
     void                        loadUserData    (const VariantMap &data);
 
-    uint32_t                    bind            (MaterialInstance *instance, uint8_t layer, uint16_t type);
+    uint32_t                    bind            (uint8_t layer);
     void                        unbind          (uint8_t);
 
     uint32_t                    getProgram      (uint16_t type) const;
 
+    uint32_t                    buildShader     (uint8_t type, const string &src = string());
+
+    TextureMap                  textures        () const { return m_Textures; }
+
+    string                      loadIncludes    (const string &path, const string &define = string());
+
 protected:
-    void                        clear           ();
-
-    uint32_t                    buildShader     (uint8_t type, const string &src, const string &path = string());
-
-    uint32_t                    buildProgram    (uint32_t fragment, const string &define);
-
-    bool                        checkShader     (uint32_t shader, const string &path, bool link = false);
-
     void                        addPragma       (const string &key, const string &value);
 
     string                      parseData       (const string &data, const string &define);
 
-    string                      loadIncludes    (const string &path, const string &define = string());
+    bool                        checkShader     (uint32_t shader, const string &path, bool link = false);
 
 private:
-    typedef map<uint16_t, uint32_t> ProgramMap;
-
-    ProgramMap                  m_Programs;
+    ObjectMap                   m_Programs;
 
     typedef map<string, string> PragmaMap;
 

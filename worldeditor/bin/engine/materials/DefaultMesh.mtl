@@ -1,5 +1,6 @@
 {
     "Blend": 0,
+    "Depth": true,
     "Links": [
         {
             "RItem": "Roughness",
@@ -19,5 +20,6 @@
             "Y": 0
         }
     ],
-    "Side": false
+    "Side": false,
+    "Type": 0
 }

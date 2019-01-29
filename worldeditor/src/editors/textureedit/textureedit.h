@@ -5,14 +5,13 @@
 
 #include "assetmanager.h"
 
-#include "textureimportsettings.h"
-
 class Viewport;
 class Engine;
 
 class Texture;
 class SpriteMesh;
 class TextureConverter;
+class TextureImportSettings;
 
 namespace Ui {
     class TextureEdit;
@@ -25,7 +24,7 @@ public:
     TextureEdit                 (Engine *engine);
     ~TextureEdit                ();
 
-    void                        timerEvent          (QTimerEvent *event);
+    void                        timerEvent          (QTimerEvent *);
 
     void                        readSettings        ();
     void                        writeSettings       ();
@@ -40,11 +39,9 @@ private:
 
     Ui::TextureEdit            *ui;
 
-    Viewport                   *glWidget;
-
     Texture                    *m_pTexture;
 
-    SpriteMesh                     *m_pSprite;
+    SpriteMesh                 *m_pSprite;
 
     TextureImportSettings      *m_pSettings;
 

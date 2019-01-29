@@ -15,7 +15,7 @@
 #include <QMessageBox>
 #include <QProcess>
 
-#include "common.h"
+#include <global.h>
 
 #include "contentlist.h"
 #include "contenttree.h"
@@ -23,9 +23,11 @@
 #include "assetmanager.h"
 #include "projectmanager.h"
 
+const QString gTemplateName("${templateName}");
+
 class ContentFilter : public QSortFilterProxyModel {
 public:
-    typedef QList<uint8_t>  TypeList;
+    typedef QList<int32_t> TypeList;
 
     explicit ContentFilter(QObject *parent) :
             QSortFilterProxyModel(parent) {
@@ -75,8 +77,8 @@ protected:
 
     bool checkContentTypeFilter(int sourceRow, const QModelIndex &sourceParent) const {
         QModelIndex index   = sourceModel()->index(sourceRow, 3, sourceParent);
-        foreach (uint8_t it, m_List) {
-            uint8_t type    = sourceModel()->data(index).toInt();
+        foreach (int32_t it, m_List) {
+            int32_t type    = sourceModel()->data(index).toInt();
             if(it == type) {
                 return true;
             }
@@ -98,7 +100,7 @@ protected:
 
 class AssetItemDeligate : public QStyledItemDelegate  {
 public:
-    explicit AssetItemDeligate(QObject *parent = 0) :
+    explicit AssetItemDeligate(QObject *parent = nullptr) :
             QStyledItemDelegate(parent),
             m_Scale(1.0f) {
     }
@@ -116,20 +118,19 @@ public:
 private:
     void initStyleOption(QStyleOptionViewItem *option, const QModelIndex &index) const {
         QStyledItemDelegate::initStyleOption(option, index);
-        if(QStyleOptionViewItemV4 *v4 = qstyleoption_cast<QStyleOptionViewItemV4 *>(option)) {
-            QVariant value  = index.data(Qt::DecorationRole);
-            switch(value.type()) {
-                case QVariant::Image: {
-                    QImage image    = value.value<QImage>();
-                    if(!image.isNull()) {
-                        QSize origin    = image.size();
-                        image           = image.scaled(origin.width() * m_Scale, origin.height() * m_Scale, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-                        v4->icon        = QIcon(QPixmap::fromImage(image));
-                        v4->decorationSize = image.size();
-                    }
-                } break;
-                default: break;
-            }
+        QVariant value  = index.data(Qt::DecorationRole);
+        switch(value.type()) {
+            case QVariant::Image: {
+                QImage image    = value.value<QImage>();
+                if(!image.isNull()) {
+                    QSize origin    = image.size();
+                    image           = image.scaled(origin.width() * m_Scale, origin.height() * m_Scale,
+                                                   Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+                    option->icon    = QIcon(QPixmap::fromImage(image));
+                    option->decorationSize = image.size();
+                }
+            } break;
+            default: break;
         }
     }
 
@@ -137,7 +138,7 @@ private:
         return QStyledItemDelegate::sizeHint(option, index) * m_Scale;
     }
 
-    QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const {
+    QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &, const QModelIndex &) const {
         return new QLineEdit(parent);
     }
 
@@ -157,7 +158,7 @@ private:
     }
 
     void setEditorData(QWidget *editor, const QModelIndex &index) const {
-        uint32_t width  = editor->width();
+        int32_t width = editor->width();
         QStyledItemDelegate::setEditorData(editor, index);
         editor->setFixedWidth(width);
     }
@@ -167,7 +168,8 @@ private:
 
 ContentBrowser::ContentBrowser(QWidget* parent) :
         QWidget(parent),
-        ui(new Ui::ContentBrowser) {
+        ui(new Ui::ContentBrowser),
+        m_pSelected(nullptr) {
 
     ui->setupUi(this);
 
@@ -212,6 +214,8 @@ ContentBrowser::ContentBrowser(QWidget* parent) :
         m_CreationMenu.addAction(showIn, this, SLOT(showInGraphicalShell()));
         m_CreationMenu.addSeparator();
         m_CreationMenu.addAction(a);
+        m_CreationMenu.addAction(tr("NativeBehaviour"))->setData(".cpp");
+        m_CreationMenu.addAction(tr("ParticleEffect"))->setData(".efx");
         m_CreationMenu.addAction(tr("Material"))->setData(".mtl");
     }
 
@@ -227,6 +231,10 @@ ContentBrowser::ContentBrowser(QWidget* parent) :
 
 ContentBrowser::~ContentBrowser() {
     writeSettings();
+
+    delete ui;
+
+    delete m_pSelected;
 }
 
 void ContentBrowser::readSettings() {
@@ -254,9 +262,19 @@ void ContentBrowser::onCreationMenuTriggered(QAction *action) {
             QString name    = QString("New") + action->text();
             QString suff    = action->data().toString();
             AssetManager::findFreeName(name, dir.path(), suff);
-            QFile file(dir.path() + QDir::separator() + name + suff );
-            if(file.open(QIODevice::WriteOnly)) {
+
+            QFile file(ProjectManager::instance()->templatePath() + "/" + suff + ".tpl");
+            if(file.open(QFile::ReadOnly | QFile::Text)) {
+                QByteArray data(file.readAll());
                 file.close();
+
+                data.replace(gTemplateName, qPrintable(name));
+
+                QFile gen(dir.path() + QDir::separator() + name + suff);
+                if(gen.open(QFile::ReadWrite | QFile::Text | QFile::Truncate)) {
+                    gen.write(data);
+                    gen.close();
+                }
             }
         } break;
         default: break;
@@ -302,10 +320,8 @@ void ContentBrowser::setCompact(bool value) {
     ui->contentList->setViewMode((value) ? QListView::ListMode : QListView::IconMode);
 }
 
-void ContentBrowser::filterByType(const uint8_t type) {
-    ContentFilter::TypeList list;
-    list.append(type);
-    m_pContentProxy->setContentTypes(list);
+void ContentBrowser::filterByType(const uint32_t type) {
+    m_pContentProxy->setContentTypes({ AssetManager::instance()->toContentType(type) });
 }
 
 void ContentBrowser::setSelected(const QString &resource) {
@@ -327,7 +343,27 @@ void ContentBrowser::on_contentTree_clicked(const QModelIndex &index) {
 
 void ContentBrowser::on_contentList_clicked(const QModelIndex &index) {
     QModelIndex origin   = m_pContentProxy->mapToSource(index);
-    emit assetSelected(AssetManager::instance()->pathToGuid(ContentList::instance()->path(origin).toStdString()).c_str());
+
+    QString source = ContentList::instance()->path(origin);
+    QFileInfo path(source);
+    bool embedded = false;
+    if(source.contains(".embedded/")) {
+        embedded = true;
+    } else {
+        path = ProjectManager::instance()->contentPath() + QDir::separator() + source;
+    }
+
+    if(embedded || path.isFile()) {
+        if(m_pSelected) {
+            delete m_pSelected;
+        }
+        m_pSelected = AssetManager::instance()->createSettings(path);
+        if(embedded) {
+            string guid = AssetManager::instance()->pathToGuid(source.toStdString());
+            m_pSelected->setDestination(guid.c_str());
+        }
+        emit assetSelected(m_pSelected);
+    }
 }
 
 void ContentBrowser::on_contentList_doubleClicked(const QModelIndex &index) {
@@ -367,8 +403,6 @@ void ContentBrowser::on_contentList_customContextMenuRequested(const QPoint &pos
 }
 
 void ContentBrowser::showInGraphicalShell() {
-    //QDesktopServices::openUrl(QUrl("file:///D:/", QUrl::TolerantMode));
-
     QString path;
     QModelIndexList list    = ui->contentList->selectionModel()->selectedIndexes();
     if(list.empty()) {
@@ -376,8 +410,10 @@ void ContentBrowser::showInGraphicalShell() {
     } else {
         const QModelIndex origin    = m_pContentProxy->mapToSource(list.first());
         QObject *item   = static_cast<QObject *>(origin.internalPointer());
-        QFileInfo info(ProjectManager::instance()->contentPath() + QDir::separator() + item->objectName());
-        path    = info.absoluteFilePath();
+        if(item) {
+            QFileInfo info(ProjectManager::instance()->contentPath() + QDir::separator() + item->objectName());
+            path    = info.absoluteFilePath();
+        }
     }
 
 #if defined(Q_OS_WIN)
@@ -393,22 +429,9 @@ void ContentBrowser::showInGraphicalShell() {
                << QLatin1String("tell application \"Finder\" to activate");
     QProcess::execute("/usr/bin/osascript", scriptArgs);
 #else
-/*
-    // we cannot select a file here, because no file browser really supports it...
     const QFileInfo fileInfo(path);
-    const QString folder = fileInfo.absoluteFilePath();
-    const QString app = Utils::UnixUtils::fileBrowser(Core::ICore::instance()->settings());
-    QProcess browserProc;
-    const QString browserArgs = Utils::UnixUtils::substituteFileBrowserParameters(app, folder);
-    if (debug) {
-        qDebug() <<  browserArgs;
-    }
-    bool success = browserProc.startDetached(browserArgs);
-    const QString error = QString::fromLocal8Bit(browserProc.readAllStandardError());
-    success = success && error.isEmpty();
-    if (!success) {
-        showGraphicalShellError(parent, app, error);
-    }
-*/
+    QStringList scriptArgs;
+    scriptArgs << fileInfo.absoluteFilePath();
+    QProcess::execute(QLatin1String("xdg-open"), scriptArgs);
 #endif
 }

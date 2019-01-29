@@ -10,31 +10,34 @@
 #define DEG2RAD (PI / 180.0f)
 #define RAD2DEG (180.0f / PI)
 
+#define SQR(a) (a * a)
+#define QUAD(a) (a * a * a)
+
 #define MAX(a, b)  (((a) > (b)) ? (a) : (b))
 #define MIN(a, b)  (((a) < (b)) ? (a) : (b))
 
 #define CLAMP(x, min, max)	((x < min) ? min : (x > max) ? max : x)
-#define MIX(a, b, f) (a * (1 - f) + b * f)
+#define MIX(a, b, f)        (a * (1 - f) + b * f)
+#define QMIX(a, b, c, f)    (a * SQR(1 - f) + b * 2 * f * (1 - f) + c * SQR(f))
+#define CMIX(a, b, c, d, f) (a * QUAD(1 - f) + b * 3 * f * SQR(1 - f) + c * 3 * SQR(f) * (1 - f) + d * QUAD(f))
 
-#define SQR(a) (a * a)
+#define RANGE(min, max) (min + ((max - min) * (static_cast<areal>(rand()) / RAND_MAX)))
 
-#define RANGE(min, max) (min + ((max - min) * ((areal)rand() / RAND_MAX)))
+#include "vector2.h"
+#include "vector3.h"
+#include "vector4.h"
 
-#include "math/vector2.h"
-#include "math/vector3.h"
-#include "math/vector4.h"
+#include "matrix3.h"
+#include "matrix4.h"
 
-#include "math/matrix3.h"
-#include "math/matrix4.h"
+#include "quaternion.h"
 
-#include "math/quaternion.h"
+#include "plane.h"
 
-#include "math/plane.h"
+#include "aabb.h"
+#include "obb.h"
 
-#include "math/aabb.h"
-#include "math/obb.h"
-
-#include "math/ray.h"
+#include "ray.h"
 
 #include <vector>
 typedef std::vector<Vector2>    Vector2Vector;

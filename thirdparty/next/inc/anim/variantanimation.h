@@ -3,13 +3,15 @@
 
 #include "animation.h"
 
-class VariantAnimationPrivate;
+#include "keyframe.h"
 
-typedef pair<float, Variant>    KeyFrame;
-typedef vector<KeyFrame>        FrameVector;
+class VariantAnimationPrivate;
 
 class NEXT_LIBRARY_EXPORT VariantAnimation : public Animation {
     A_REGISTER(VariantAnimation, Animation, Animation)
+
+public:
+    typedef list<KeyFrame>          Curve;
 
 public:
     VariantAnimation                ();
@@ -17,18 +19,19 @@ public:
     ~VariantAnimation               ();
 
     int32_t                         loopDuration                () const;
-    void                            setLoopDuration             (int32_t msec);
 
     Variant                         currentValue                () const;
+    virtual void                    setCurrentValue             (const Variant &value);
 
-    void                            setKeyFrames                (const FrameVector &frames);
+    Curve                          &keyFrames                   () const;
+    void                            setKeyFrames                (Curve &frames);
 
 protected:
     void                            update                      ();
 
-    virtual void                    valueUpdated                (const Variant &value);
 private:
     VariantAnimationPrivate        *p_ptr;
+
 };
 
 #endif // VARIANTANIMATION_H

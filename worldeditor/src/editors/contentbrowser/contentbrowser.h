@@ -9,7 +9,7 @@
 
 #include <engine.h>
 
-#include "baseconvertersettings.h"
+#include "converters/converter.h"
 
 class QSortFilterProxyModel;
 class AssetItemDeligate;
@@ -48,14 +48,14 @@ public:
 
     void                    setCompact              (bool value);
 
-    void                    filterByType            (const uint8_t);
+    void                    filterByType            (const uint32_t);
 
     void                    setSelected             (const QString &resource);
 
     QImage                  icon                    (const QString &resource) const;
 
 signals:
-    void                    assetSelected           (const QString &source);
+    void                    assetSelected           (IConverterSettings *settings);
 
 protected:
     void                    readSettings            ();
@@ -99,6 +99,8 @@ private:
     QMenu                   m_ContentMenu;
 
     QMenu                   m_CreationMenu;
+
+    IConverterSettings     *m_pSelected;
 
 };
 

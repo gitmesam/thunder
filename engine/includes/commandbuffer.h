@@ -1,15 +1,20 @@
 #ifndef COMMANDBUFFER_H
 #define COMMANDBUFFER_H
 
-#include <object.h>
+#include "engine.h"
 
+class RenderTexture;
 class Texture;
 class Mesh;
 
 class Camera;
 class MaterialInstance;
 
-class NEXT_LIBRARY_EXPORT ICommandBuffer {
+typedef vector<RenderTexture *> TargetBuffer;
+
+class NEXT_LIBRARY_EXPORT ICommandBuffer: public Object {
+    A_REGISTER(ICommandBuffer, Object, System)
+
 public:
     enum LayerTypes {
         DEFAULT     = (1<<0),
@@ -25,24 +30,33 @@ public:
 
     virtual void                drawMesh                    (const Matrix4 &model, Mesh *mesh, uint32_t surface = 0, uint8_t layer = ICommandBuffer::DEFAULT, MaterialInstance *material = nullptr);
 
-    virtual void                setRenderTarget             (uint8_t numberColors, const Texture *colors, const Texture *depth);
+    virtual void                drawMeshInstanced           (const Matrix4 *models, uint32_t count, Mesh *mesh, uint32_t surface = 0, uint8_t layer = ICommandBuffer::DEFAULT, MaterialInstance *material = nullptr, bool particle = false);
+
+    virtual void                setRenderTarget             (const TargetBuffer &target, const RenderTexture *depth = nullptr);
+
+    virtual void                setRenderTarget             (uint32_t target);
 
     virtual void                setColor                    (const Vector4 &color);
+
+    virtual void                setScreenProjection         ();
+
+    virtual void                resetViewProjection         ();
 
     virtual void                setViewProjection           (const Matrix4 &view, const Matrix4 &projection);
 
     virtual void                setGlobalValue              (const char *name, const Variant &value);
 
-    virtual void                setViewport                 (uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+    virtual void                setGlobalTexture            (const char *name, const Texture *value);
+
+    virtual void                setViewport                 (int32_t x, int32_t y, int32_t width, int32_t height);
 
     virtual Matrix4             projection                  () const;
 
     virtual Matrix4             modelView                   () const;
 
-    static Vector4              idToColor                   (uint32_t id);
+    virtual const Texture      *texture                     (const char *name) const;
 
-protected:
-    static void                 setHandler                  (ICommandBuffer *handler);
+    static Vector4              idToColor                   (uint32_t id);
 
 };
 

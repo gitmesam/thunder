@@ -12,20 +12,38 @@
 #define DEFAULTMESH ".embedded/DefaultMesh.mtl"
 
 Mesh::Mesh() :
+        m_Dynamic(false),
         m_Flags(0) {
 
 }
 
 Mesh::~Mesh() {
-
+    clear();
 }
 
 void Mesh::apply() {
+    Vector3 aabb[2];
+    for(Surface it : m_Surfaces) {
+        Vector3 min;
+        Vector3 max;
+        it.aabb.box(min, max);
+        aabb[0].x   = MIN(aabb[0].x, min.x);
+        aabb[0].y   = MIN(aabb[0].y, min.y);
+        aabb[0].z   = MIN(aabb[0].z, min.z);
 
+        aabb[1].x   = MAX(aabb[1].x, max.x);
+        aabb[1].y   = MAX(aabb[1].y, max.y);
+        aabb[1].z   = MAX(aabb[1].z, max.z);
+    }
+    m_Box.setBox(aabb[0], aabb[1]);
 }
 
 void Mesh::clear() {
     m_Surfaces.clear();
+}
+
+void Mesh::makeDynamic() {
+    m_Dynamic   = true;
 }
 
 void Mesh::loadUserData(const VariantMap &data) {
@@ -139,20 +157,6 @@ void Mesh::loadUserData(const VariantMap &data) {
             addSurface(s);
         }
     }
-    Vector3 aabb[2];
-    for(Surface it : m_Surfaces) {
-        Vector3 min;
-        Vector3 max;
-        it.aabb.box(min, max);
-        aabb[0].x   = MIN(aabb[0].x, min.x);
-        aabb[0].y   = MIN(aabb[0].y, min.y);
-        aabb[0].z   = MIN(aabb[0].z, min.z);
-
-        aabb[1].x   = MAX(aabb[1].x, max.x);
-        aabb[1].y   = MAX(aabb[1].y, max.y);
-        aabb[1].z   = MAX(aabb[1].z, max.z);
-    }
-    m_Box.setBox(aabb[0], aabb[1]);
 
     apply();
 }
@@ -231,4 +235,12 @@ void Mesh::setFlags(uint8_t flags) {
 
 void Mesh::addSurface(const Surface &surface) {
     m_Surfaces.push_back(surface);
+}
+
+void Mesh::setSurface(uint32_t index, Surface &surface) {
+    if(index < surfacesCount()) {
+        m_Surfaces[index]   = surface;
+    } else {
+        addSurface(surface);
+    }
 }

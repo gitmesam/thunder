@@ -20,115 +20,73 @@ const regex include("^[ ]*#[ ]*include[ ]+[\"<](.*)[\">][^?]*");
 const regex pragma("^[ ]*#[ ]*pragma[ ]+(.*)[^?]*");
 
 const char *gPost       = "PostEffect.frag";
-const char *gSurface    = "Surface.frag";
 const char *gLight      = "DirectLight.frag";
 const char *gVertex     = "BasePass.vert";
 
 const string gEmbedded(".embedded/");
 
-AMaterialGL::AMaterialGL() :
-        Material() {
-
-}
-
 AMaterialGL::~AMaterialGL() {
-
+    clear();
 }
 
 void AMaterialGL::loadUserData(const VariantMap &data) {
     Material::loadUserData(data);
-
-    auto it = data.find("Shader");
-    if(it == data.end()) {
-        return ;
-    }
-
-    addPragma("material", (*it).second.toString());
-
-    ProgramMap fragments;
     // Number of shader pairs calculation
     switch(m_MaterialType) {
         case PostProcess: {
             m_DoubleSided   = true;
-            m_Tangent       = false;
             m_BlendMode     = Opaque;
             m_LightModel    = Unlit;
             m_Surfaces      = Static;
+            m_DepthTest     = false;
 
-            fragments[0]    = buildShader(Fragment, loadIncludes(gEmbedded + gPost), gEmbedded + gPost);
+            m_Programs[Static] = buildShader(Static, loadIncludes(gEmbedded + gVertex, "#define TYPE_STATIC 1"));
+            m_Programs[Default] = buildShader(Default, loadIncludes(gEmbedded + gPost));
         } break;
         case LightFunction: {
-            m_DoubleSided   = true;
-            m_Tangent       = false;
-            m_BlendMode     = Opaque;
-            m_LightModel    = Unlit;
-            m_Surfaces      = Static;
-
-            fragments[0]    = buildShader(Fragment, loadIncludes(gEmbedded + gLight), gEmbedded + gPost);
             /// \todo should be removed
-            setTexture("layer0",    nullptr);
-            setTexture("layer1",    nullptr);
-            setTexture("layer2",    nullptr);
-            setTexture("layer3",    nullptr);
-            setTexture("depthMap",  nullptr);
-            setTexture("shadowMap", nullptr);
+            setTexture("normalsMap",    nullptr);
+            setTexture("diffuseMap",    nullptr);
+            setTexture("paramsMap",     nullptr);
+            setTexture("emissiveMap",   nullptr);
+            setTexture("depthMap",      nullptr);
+            setTexture("shadowMap",     nullptr);
 
+            m_Programs[Static] = buildShader(Static, loadIncludes(gEmbedded + gVertex, "#define TYPE_STATIC 1"));
+            m_Programs[Default] = buildShader(Default, loadIncludes(gEmbedded + gLight));
         } break;
         default: { // Surface type
-            string define;
-            switch(m_BlendMode) {
-                case Additive: {
-                    define  = "#define BLEND_ADDITIVE 1";
-                } break;
-                case Translucent: {
-                    define  = "#define BLEND_TRANSLUCENT 1";
-                } break;
-                default: {
-                    define  = "#define BLEND_OPAQUE 1";
-                } break;
+            {
+                auto it = data.find("Shader");
+                if(it != data.end()) {
+                    m_Programs[Default] = buildShader(Default, (*it).second.toString());
+                }
             }
-            switch(m_LightModel) {
-                case Lit: {
-                    define += "\n#define MODEL_LIT 1";
-                } break;
-                case Subsurface: {
-                    define += "\n#define MODEL_SUBSURFACE 1";
-                } break;
-                default: {
-                    define += "\n#define MODEL_UNLIT 1";
-                } break;
+            {
+                auto it = data.find("Simple");
+                if(it != data.end()) {
+                    m_Programs[Simple] = buildShader(Simple, (*it).second.toString());
+                }
             }
-            if(m_Tangent) {
-                define += "\n#define TANGENT 1";
+            {
+                auto it = data.find("Static");
+                if(it != data.end()) {
+                    m_Programs[Static] = buildShader(Static, (*it).second.toString());
+                }
             }
-
-            fragments[0]        = buildShader(Fragment, loadIncludes(gEmbedded + gSurface, define), gEmbedded + gPost);
-            define += "\n#define SIMPLE 1";
-            fragments[Simple]   = buildShader(Fragment, loadIncludes(gEmbedded + gSurface, define), gEmbedded + gPost);
-            // if cast shadows
-            fragments[Depth]    = buildShader(Fragment, loadIncludes(gEmbedded + gSurface, define + "\n#define DEPTH 1"), gEmbedded + gPost);
+            {
+                auto it = data.find("StaticInst");
+                if(it != data.end()) {
+                    m_Programs[Instanced] = buildShader(Instanced, (*it).second.toString());
+                }
+            }
+            {
+                auto it = data.find("Particle");
+                if(it != data.end()) {
+                    m_Programs[Particle] = buildShader(Particle, (*it).second.toString());
+                }
+            }
         } break;
-    }
-
-    if(m_Surfaces & Static) {
-        for(auto it : fragments) {
-            m_Programs[Static | it.first]  = buildProgram(it.second, "#define TYPE_STATIC 1");
-        }
-    }
-    if(m_Surfaces & Skinned) {
-        for(auto it : fragments) {
-            m_Programs[Skinned | it.first]  = buildProgram(it.second, "#define TYPE_SKINNED 1");
-        }
-    }
-    if(m_Surfaces & Billboard) {
-        for(auto it : fragments) {
-            m_Programs[Billboard | it.first]    = buildProgram(it.second, "#define TYPE_BILLBOARD 1");
-        }
-    }
-    if(m_Surfaces & Oriented) {
-        for(auto it : fragments) {
-            m_Programs[Oriented | it.first]     = buildProgram(it.second, "#define TYPE_AXISALIGNED 1");
-        }
     }
 }
 
@@ -140,10 +98,10 @@ uint32_t AMaterialGL::getProgram(uint16_t type) const {
     return 0;
 }
 
-uint32_t AMaterialGL::bind(MaterialInstance *instance, uint8_t layer, uint16_t type) {
-    uint8_t b   = blendMode();
+uint32_t AMaterialGL::bind(uint8_t layer) {
+    int32_t b   = blendMode();
 
-    if((layer & ICommandBuffer::DEFAULT || layer & ICommandBuffer::SHADOWCAST) && //  || layer & ICommandBuffer::RAYCAST
+    if((layer & ICommandBuffer::DEFAULT || layer & ICommandBuffer::SHADOWCAST) &&
        (b == Material::Additive || b == Material::Translucent)) {
         return 0;
     }
@@ -151,12 +109,11 @@ uint32_t AMaterialGL::bind(MaterialInstance *instance, uint8_t layer, uint16_t t
         return 0;
     }
 
+    uint16_t type   = AMaterialGL::Default;
     switch(layer) {
-        case ICommandBuffer::RAYCAST:    {
-            type   |= AMaterialGL::Simple;
-        } break;
+        case ICommandBuffer::RAYCAST:
         case ICommandBuffer::SHADOWCAST: {
-            type   |= AMaterialGL::Depth;
+            type    = AMaterialGL::Simple;
         } break;
         default: break;
     }
@@ -165,35 +122,11 @@ uint32_t AMaterialGL::bind(MaterialInstance *instance, uint8_t layer, uint16_t t
         return 0;
     }
 
-    glUseProgram(program);
-
-    int location    = glGetUniformLocation(program, "_time");
-    if(location > -1) {
-        glUniform1f(location, Timer::time());
-    }
-    // Push uniform values to shader
-    for(const auto &it : instance->params()) {
-        location    = glGetUniformLocation(program, it.first.c_str());
-        if(location > -1) {
-            const MaterialInstance::Info &data  = it.second;
-            for(uint32_t i = 0; i < data.count; i++) {
-                switch(data.type) {
-                    case 0: break;
-                    case MetaType::INTEGER: glUniform1i         (location + i, *static_cast<const int32_t *>(data.ptr)); break;
-                    case MetaType::VECTOR2: glUniform2fv        (location + i, 1, static_cast<const float *>(data.ptr)); break;
-                    case MetaType::VECTOR3: glUniform3fv        (location + i, 1, static_cast<const float *>(data.ptr)); break;
-                    case MetaType::VECTOR4: glUniform4fv        (location + i, 1, static_cast<const float *>(data.ptr)); break;
-                    case MetaType::MATRIX4: glUniformMatrix4fv  (location + i, 1, GL_FALSE, static_cast<const float *>(data.ptr)); break;
-                    default:                glUniform1f         (location + i, *static_cast<const float *>(data.ptr)); break;
-                }
-            }
-        }
-    }
-
-    if(m_DepthTest) {
-        glEnable(GL_DEPTH_TEST);
-    } else {
+    if(!m_DepthTest/* || layer & ICommandBuffer::RAYCAST*/) {
         glDisable(GL_DEPTH_TEST);
+    } else {
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc((layer & ICommandBuffer::DEFAULT) ? GL_EQUAL : GL_LEQUAL);
     }
 
     if(!isDoubleSided() && !(layer & ICommandBuffer::RAYCAST)) {
@@ -201,37 +134,14 @@ uint32_t AMaterialGL::bind(MaterialInstance *instance, uint8_t layer, uint16_t t
         glCullFace  ( GL_BACK );
     }
 
-    uint8_t blend   = blendMode();
-    if(blend != Material::Opaque && !(layer & ICommandBuffer::RAYCAST)) {
+    if(b != Material::Opaque && !(layer & ICommandBuffer::RAYCAST)) {
         glEnable    ( GL_BLEND );
-        if(blend == Material::Translucent) {
+        if(b == Material::Translucent) {
             glBlendFunc ( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
         } else {
             glBlendFunc ( GL_SRC_ALPHA, GL_ONE );
         }
         glBlendEquation(GL_FUNC_ADD);
-    }
-
-    glEnable(GL_TEXTURE_2D);
-    uint8_t i   = 0;
-    for(auto it : m_Textures) {
-        int location    = glGetUniformLocation(program, it.first.c_str());
-        if(location > -1) {
-            glUniform1i(location, i);
-        }
-
-        const ATextureGL *texture   = static_cast<const ATextureGL *>(it.second);
-        glActiveTexture(GL_TEXTURE0 + i);
-        if(instance) {
-            const Texture *t    = instance->texture(it.first.c_str());
-            if(t) {
-                texture = static_cast<const ATextureGL *>(t);
-            }
-        }
-        if(texture) {
-            texture->bind();
-        }
-        i++;
     }
 
     return program;
@@ -241,9 +151,9 @@ void AMaterialGL::unbind(uint8_t) {
     uint8_t t   = 0;
     for(auto it : m_Textures) {
         glActiveTexture(GL_TEXTURE0 + t);
-        const ATextureGL *texture = static_cast<const ATextureGL *>(it.second);
+        const Texture *texture  = it.second;
         if(texture) {
-            texture->unbind();
+            glBindTexture((texture->isCubemap()) ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, 0);
         }
         t++;
     }
@@ -252,7 +162,7 @@ void AMaterialGL::unbind(uint8_t) {
 
     glUseProgram(0);
 
-    uint8_t blend   = blendMode();
+    int32_t blend   = blendMode();
     if(blend == Material::Additive || blend == Material::Translucent) {
         glDisable   ( GL_BLEND );
     }
@@ -263,71 +173,61 @@ void AMaterialGL::clear() {
     Material::clear();
 
     m_Pragmas.clear();
-#ifdef GL_ES_VERSION_2_0
-    addPragma("version", "");
-#else
-    addPragma("version", "#version 410 core");
-    //addPragma("version", "#version 300 es");
-#endif
+
+    addPragma("version", "#version 430 core");
+
     for(auto it : m_Programs) {
         glDeleteProgram(it.second);
     }
     m_Programs.clear();
 }
 
-uint32_t AMaterialGL::buildShader(uint8_t type, const string &src, const string &path) {
-    uint32_t shader = 0;
-    switch(type) {
-        case Vertex:    shader  = glCreateShader(GL_VERTEX_SHADER);   break;
-#ifndef GL_ES_VERSION_2_0
-        case Geometry:  shader  = glCreateShader(GL_GEOMETRY_SHADER); break;
-#endif
-        default:        shader  = glCreateShader(GL_FRAGMENT_SHADER); break;
-    }
+uint32_t AMaterialGL::buildShader(uint8_t type, const string &src) {
+    uint32_t result = 0;
+
     const char *data    = src.c_str();
 
-    if(shader) {
-        glShaderSource  (shader, 1, &data, NULL);
-        glCompileShader (shader);
-        bool result = true;
-        result     &= checkShader(shader, path);
-        if(result) {
-            return shader;
-        }
-        glDeleteShader(shader);
+    uint32_t t;
+    switch(type) {
+        case Default:
+        case Simple: {
+            t  = GL_FRAGMENT_SHADER;
+        } break;
+        default: {
+            t  = GL_VERTEX_SHADER;
+        } break;
     }
-    return 0;
-}
 
-uint32_t AMaterialGL::buildProgram(uint32_t fragment, const string &define) {
-    uint32_t vertex     = buildShader(Vertex, loadIncludes(gEmbedded + gVertex, define));
+    uint32_t shader = glCreateShader(t);
+    glShaderSource(shader, 1, &data, nullptr);
+    glCompileShader(shader);
+    checkShader(shader, "");
 
-    if(fragment && vertex) {
-        uint32_t program    = glCreateProgram();
-        if(program) {
-            glAttachShader  (program, vertex);
-            glAttachShader  (program, fragment);
+    result = glCreateProgram();
+    if (result) {
+        GLint compiled = GL_FALSE;
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+        glProgramParameteriEXT(result, GL_PROGRAM_SEPARABLE_EXT, GL_TRUE);
+        if(compiled) {
+            glAttachShader(result, shader);
+            glLinkProgram(result);
+            glDetachShader(result, shader);
+        }
+        checkShader(result, "", true);
+    }
+    glDeleteShader(shader);
 
-            glLinkProgram   (program);
-            checkShader(program, string(), true);
-
-            glDetachShader  (program, fragment);
-            glDetachShader  (program, vertex);
-
-            glUseProgram(program);
-            uint8_t t   = 0;
-            for(auto it : m_Textures) {
-                int location    = glGetUniformLocation(program, it.first.c_str());
-                if(location > -1) {
-                    glUniform1i(location, t);
-                }
-                t++;
+    if(type >= Default) {
+        uint8_t t   = 0;
+        for(auto it : m_Textures) {
+            int location    = glGetUniformLocation(result, it.first.c_str());
+            if(location > -1) {
+                glProgramUniform1iEXT(result, location, t);
             }
-            glUseProgram(0);
-            return program;
+            t++;
         }
     }
-    return 0;
+    return result;
 }
 
 bool AMaterialGL::checkShader(uint32_t shader, const string &path, bool link) {
@@ -348,14 +248,12 @@ bool AMaterialGL::checkShader(uint32_t shader, const string &path, bool link) {
         if(value) {
             char *buff  = new char[value + 1];
             if(!link) {
-                glGetShaderInfoLog(shader, value, NULL, buff);
+                glGetShaderInfoLog(shader, value, nullptr, buff);
             } else {
-                glGetProgramInfoLog(shader, value, NULL, buff);
+                glGetProgramInfoLog(shader, value, nullptr, buff);
             }
             Log(Log::ERR) << "[ Render::ShaderGL ]" << path.c_str() << "\n[ Said ]" << buff;
             delete []buff;
-        } else {
-            //m_Valid = false;
         }
         return false;
     }

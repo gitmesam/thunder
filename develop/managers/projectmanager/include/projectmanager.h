@@ -3,14 +3,12 @@
 
 #include <QObject>
 #include <QFileInfo>
-#include <patterns/asingleton.h>
 
 #include <engine.h>
 
 #include <assetmanager.h>
 
-#include <QDebug>
-class ProjectManager : public QObject, public ASingleton<ProjectManager> {
+class ProjectManager : public QObject {
     Q_OBJECT
 
     Q_PROPERTY(QString Project_Name READ projectName WRITE setProjectName DESIGNABLE true USER true)
@@ -20,11 +18,16 @@ class ProjectManager : public QObject, public ASingleton<ProjectManager> {
     Q_PROPERTY(Template First_Map READ firstMap WRITE setFirstMap DESIGNABLE true USER true)
 
 public:
+    static ProjectManager      *instance                    ();
+
+    static void                 destroy                     ();
 
     void                        init                        (const QString &project, const QString &target = QString());
 
     QString                     projectName                 () const { return m_ProjectName; }
     void                        setProjectName              (const QString &value) { m_ProjectName = value; }
+
+    QString                     projectId                   () const { return m_ProjectId; }
 
     QString                     projectCompany              () const { return m_CompanyName; }
     void                        setProjectCompany           (const QString &value) { m_CompanyName = value; }
@@ -46,6 +49,7 @@ public:
 
     QString                     sdkPath                     () const { return m_SDKPath.absoluteFilePath(); }
     QString                     resourcePath                () const { return m_ResourcePath.absoluteFilePath(); }
+    QString                     templatePath                () const { return m_TemplatePath.absoluteFilePath(); }
 
     QString                     myProjectsPath              () const { return m_MyProjectsPath.absoluteFilePath(); }
 
@@ -57,12 +61,14 @@ public slots:
     void                        loadSettings                ();
     void                        saveSettings                ();
 
-protected:
-    friend class ASingleton<ProjectManager>;
-
+private:
     ProjectManager              ();
+    ~ProjectManager             () {}
+
+    static ProjectManager      *m_pInstance;
 
 private:
+    QString                     m_ProjectId;
     QString                     m_ProjectName;
     QString                     m_CompanyName;
     QString                     m_ProjectVersion;
@@ -80,6 +86,7 @@ private:
 
     QFileInfo                   m_SDKPath;
     QFileInfo                   m_ResourcePath;
+    QFileInfo                   m_TemplatePath;
 
     QFileInfo                   m_MyProjectsPath;
 

@@ -5,7 +5,7 @@
 
 #include <engine.h>
 
-#include "baseconvertersettings.h"
+#include "converters/converter.h"
 
 class TemplateProperty : public Property {
     Q_OBJECT
@@ -22,7 +22,7 @@ public:
     QSize               sizeHint            (const QSize &size) const;
 
 public slots:
-    void                onAssetChanged      (const QString &tpl);
+    void                onAssetChanged      (IConverterSettings *settings);
 
 };
 

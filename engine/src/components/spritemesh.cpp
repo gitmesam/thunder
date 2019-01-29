@@ -1,5 +1,6 @@
 #include "components/spritemesh.h"
 #include "components/actor.h"
+#include "components/transform.h"
 
 #include "resources/material.h"
 #include "resources/mesh.h"
@@ -9,26 +10,13 @@
 #define MATERIAL    "Material"
 #define BASEMAP     "BaseMap"
 
+#define OVERRIDE "uni.texture0"
+
 SpriteMesh::SpriteMesh() {
     m_Center    = Vector2();
-    m_Material  = nullptr;
     m_Texture   = nullptr;
-
-    m_pPlane    = Engine::loadResource<Mesh>(".embedded/plane.fbx");
-}
-
-void SpriteMesh::draw(ICommandBuffer &buffer, int8_t layer) {
-    Actor &a    = actor();
-    if(layer & (ICommandBuffer::RAYCAST | ICommandBuffer::DEFAULT | ICommandBuffer::TRANSLUCENT | ICommandBuffer::SHADOWCAST | ICommandBuffer::UI)) {
-        if(layer & ICommandBuffer::RAYCAST) {
-            buffer.setColor(ICommandBuffer::idToColor(a.uuid()));
-        }
-        if(m_Material) {
-            m_Material->setTexture("texture0", m_Texture);
-        }
-        buffer.drawMesh(a.worldTransform(), m_pPlane, 0, layer, m_Material);
-        buffer.setColor(Vector4(1.0f));
-    }
+    m_Materials.push_back(nullptr);
+    m_pMesh     = Engine::loadResource<Mesh>(".embedded/plane.fbx");
 }
 
 Vector2 SpriteMesh::center() const {
@@ -39,22 +27,15 @@ void SpriteMesh::setCenter(const Vector2 &value) {
     m_Center    = value;
 }
 
-Material *SpriteMesh::material() const {
-    return (m_Material) ? m_Material->material() : nullptr;
-}
-
-void SpriteMesh::setMaterial(Material *material) {
-    if(material) {
-        m_Material  = material->createInstance();
-    }
-}
-
 Texture *SpriteMesh::texture() const {
     return m_Texture;
 }
 
 void SpriteMesh::setTexture(Texture *texture) {
     m_Texture   = texture;
+    if(m_Materials[0]) {
+        m_Materials[0]->setTexture(OVERRIDE, m_Texture);
+    }
 }
 
 void SpriteMesh::loadUserData(const VariantMap &data) {

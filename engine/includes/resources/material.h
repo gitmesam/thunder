@@ -47,7 +47,8 @@ protected:
 };
 
 class NEXT_LIBRARY_EXPORT Material : public Object {
-    A_REGISTER(Material, Object, Resources);
+    A_REGISTER(Material, Object, Resources)
+
 public:
     enum MaterialType {
         Surface,
@@ -83,6 +84,8 @@ public:
 
     virtual ~Material           ();
 
+    virtual void                clear                       ();
+
     void                        loadUserData                (const VariantMap &data);
 
     MaterialType                materialType                () const;
@@ -104,9 +107,6 @@ public:
     virtual MaterialInstance   *createInstance              ();
 
 protected:
-    virtual void                clear                       ();
-
-protected:
     BlendType                   m_BlendMode;
 
     LightModelType              m_LightModel;
@@ -114,8 +114,6 @@ protected:
     MaterialType                m_MaterialType;
 
     bool                        m_DoubleSided;
-
-    bool                        m_Tangent;
 
     bool                        m_DepthTest;
 

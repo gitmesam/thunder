@@ -5,8 +5,6 @@
 
 #include <amath.h>
 
-#include <patterns/asingleton.h>
-
 #include <resources/mesh.h>
 
 class Texture;
@@ -16,7 +14,7 @@ class ICommandBuffer;
 
 using namespace std;
 
-class Handles : public ASingleton<Handles> {
+class Handles {
 public:
     enum Axes {
         AXIS_X  = (1 << 0),
@@ -33,6 +31,8 @@ public:
     static void             drawArrow           (const Matrix4 &transform);
 
     static void             drawLines           (const Matrix4 &transform, const Vector3Vector &points, const Mesh::IndexVector &indices);
+
+    static void             drawAABB            (AABBox &box);
 
     static bool             drawBillboard       (const Vector3 &position, const Vector2 &size, Texture *texture);
 
@@ -53,15 +53,12 @@ public:
     static Vector4          s_yColor;
     static Vector4          s_zColor;
 
-    static Camera          *s_ActiveCamera;
-
-    static Vector3          m_sMouse;
+    static Vector2          m_sMouse;
+    static Vector2          m_sScreen;
 
     static Matrix4          m_Model;
 
     static uint8_t          s_Axes;
-
-
 
 protected:
     static Mesh            *s_Cone;
@@ -69,6 +66,8 @@ protected:
     static Mesh            *s_Quad;
 
     static Mesh            *s_Move;
+
+    static Mesh            *s_Lines;
 
     static MaterialInstance*s_Gizmo;
 

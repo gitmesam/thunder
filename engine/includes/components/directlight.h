@@ -1,39 +1,36 @@
 #ifndef DIRECTLIGHT_H
 #define DIRECTLIGHT_H
 
-#include "component.h"
+#include "baselight.h"
 
-#include <amath.h>
+class Mesh;
+class MaterialInstance;
 
-class NEXT_LIBRARY_EXPORT DirectLight : public Component {
-    A_REGISTER(DirectLight, Component, Components);
+class NEXT_LIBRARY_EXPORT DirectLight : public BaseLight {
+    A_REGISTER(DirectLight, BaseLight, Components)
 
-    A_PROPERTIES(
-        A_PROPERTY(bool,    Cast_shadows,   DirectLight::castShadows, DirectLight::setCastShadows),
-        A_PROPERTY(float,   Brightness,     DirectLight::brightness, DirectLight::setBrightness),
-        A_PROPERTY(Color,   Color,          DirectLight::color, DirectLight::setColor)
-    );
+    A_NOPROPERTIES()
 
 public:
     DirectLight                 ();
 
-    bool                        castShadows             () const;
-    void                        setCastShadows          (bool shadows);
+    ~DirectLight                ();
 
-    float                       brightness              () const;
-    void                        setBrightness           (const float brightness);
+    void                        draw                    (ICommandBuffer &buffer, int8_t layer);
 
-    Vector4                     color                   () const;
-    void                        setColor                (const Vector4 &color);
+    Vector4                    &normalizedDistance      ();
+
+    Vector4                    *tiles                   ();
+
+    Matrix4                    *matrix                  ();
 
 protected:
-    float                       m_Shadows;
+    Matrix4                    *m_pMatrix;
+    Vector4                    *m_pTiles;
 
-    float                       m_Brightness;
+    Vector4                     m_NormalizedDistance;
 
-    float                       m_Bias;
-
-    Vector4                     m_Color;
+    Vector4                     m_Direction;
 };
 
 #endif // DIRECTLIGHT_H

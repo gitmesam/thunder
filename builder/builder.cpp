@@ -2,15 +2,13 @@
 
 #include "log.h"
 #include "projectmanager.h"
-#include "codemanager.h"
 
 #include <QCoreApplication>
 
 Builder::Builder() {
-    connect(AssetManager::instance(), &AssetManager::importFinished, CodeManager::instance(), &CodeManager::rebuildProject);
+    //connect(AssetManager::instance(), &AssetManager::importFinished, AssetManager::instance(), &AssetManager::rebuildProject);
 
-    connect(CodeManager::instance(), SIGNAL(buildSucess(QString)), this, SLOT(onCompileDone(QString)));
-    connect(CodeManager::instance(), &CodeManager::buildFailed, QCoreApplication::instance(), &QCoreApplication::quit);
+    connect(AssetManager::instance(), &AssetManager::importFinished, this, &Builder::onImportFinished);
 
     connect(this, &Builder::packDone, QCoreApplication::instance(), &QCoreApplication::quit);
     connect(this, &Builder::moveDone, this, &Builder::package);
@@ -79,8 +77,8 @@ bool copyRecursively(QString sourceFolder, QString destFolder) {
 
     QStringList files = sourceDir.entryList(QDir::Files);
     for(int i = 0; i< files.count(); i++) {
-        QString srcName = sourceFolder + QDir::separator() + files[i];
-        QString destName = destFolder + QDir::separator() + files[i];
+        QString srcName     = sourceFolder + QDir::separator() + files[i];
+        QString destName    = destFolder   + QDir::separator() + files[i];
         success = QFile::copy(srcName, destName);
         if(!success)
             return false;
@@ -89,8 +87,8 @@ bool copyRecursively(QString sourceFolder, QString destFolder) {
     files.clear();
     files = sourceDir.entryList(QDir::AllDirs | QDir::NoDotAndDotDot);
     for(int i = 0; i< files.count(); i++) {
-        QString srcName = sourceFolder + QDir::separator() + files[i];
-        QString destName = destFolder + QDir::separator() + files[i];
+        QString srcName     = sourceFolder + QDir::separator() + files[i];
+        QString destName    = destFolder   + QDir::separator() + files[i];
         success = copyRecursively(srcName, destName);
         if(!success) {
             return false;
@@ -99,7 +97,8 @@ bool copyRecursively(QString sourceFolder, QString destFolder) {
     return true;
 }
 
-void Builder::onCompileDone(const QString &path) {
+void Builder::onImportFinished() {
+    QString path = AssetManager::instance()->artifact();
     QFileInfo info(path);
     QFileInfo target(ProjectManager::instance()->targetPath() + "/" + info.fileName());
 
@@ -112,5 +111,6 @@ void Builder::onCompileDone(const QString &path) {
         emit moveDone(target.absoluteFilePath());
         return;
     }
-    QCoreApplication::exit(1);
+
+    QCoreApplication::exit(0);
 }

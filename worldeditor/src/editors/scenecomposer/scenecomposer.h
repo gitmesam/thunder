@@ -22,7 +22,6 @@ class Object;
 class PluginDialog;
 class ProjectManager;
 class SceneView;
-class ImportQueue;
 
 namespace Ui {
     class SceneComposer;
@@ -32,7 +31,7 @@ class SceneComposer : public QMainWindow {
     Q_OBJECT
 
 public:
-    explicit SceneComposer  (Engine *engine, QWidget *parent = 0);
+    explicit SceneComposer  (Engine *engine, QWidget *parent = nullptr);
     ~SceneComposer          ();
 
     bool                    isModified                                  () const { return mModified; }
@@ -56,15 +55,11 @@ private:
 
     QMenu                  *cmToolbars;
 
-    PluginDialog           *m_pPluginDlg;
-
     QObject                *m_pProperties;
 
     Object                 *m_pMap;
 
     QString                 mPath;
-
-    ImportQueue            *m_pImportQueue;
 
     QProcess               *m_pBuilder;
 
@@ -75,7 +70,7 @@ private:
 private slots:
     void                    onGLInit                                    ();
 
-    void                    onModified                                  ();
+    void                    onUpdated                                   ();
 
     void                    onUndoRedoUpdated                           ();
 
@@ -88,7 +83,7 @@ private slots:
     void                    parseLogs                                   (const QString &log);
 
     void                    on_action_New_triggered                     ();
-    void                    on_action_Open_triggered                    ();
+    void                    on_action_Open_triggered                    (const QString &arg = QString());
     void                    on_actionSave_triggered                     ();
     void                    on_actionSave_As_triggered                  ();
 
@@ -111,7 +106,7 @@ private slots:
     void                    on_actionBuild_Project_triggered            ();
 
     void                    on_actionOptions_triggered                  ();
-    void on_actionAbout_triggered();
+    void                    on_actionAbout_triggered                    ();
 };
 
 #endif // WORLDBUILDER_H

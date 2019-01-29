@@ -1,14 +1,17 @@
 #include "components/actor.h"
 
-#include "components/component.h"
+#include "components/transform.h"
+
+#include "commandbuffer.h"
+
+#define PREFAB  "Prefab"
+#define DATA    "PrefabData"
 
 Actor::Actor() :
-        m_pScene(nullptr),
+        m_Layers(ICommandBuffer::DEFAULT | ICommandBuffer::RAYCAST | ICommandBuffer::SHADOWCAST| ICommandBuffer::TRANSLUCENT),
         m_Enable(true),
-        m_Position(Vector3()),
-        m_Rotation(Quaternion()),
-        m_Scale(Vector3(1.0f)),
-        m_Layers(0x17) {
+        m_pTransform(nullptr),
+        m_pPrefab(nullptr) {
 
 }
 
@@ -20,72 +23,18 @@ void Actor::setEnable(const bool enable) {
     m_Enable    = enable;
 }
 
-Matrix4 Actor::transform() {
-    return Matrix4(m_Position, m_Rotation, m_Scale);
-}
-
-Vector3 Actor::position() const {
-    return m_Position;
-}
-
-Vector3 Actor::euler() const {
-    return m_Euler;
-}
-
-Quaternion Actor::rotation() const {
-    return m_Rotation;
-}
-
-Vector3 Actor::scale() const {
-    return m_Scale;
-}
-
-Matrix4 Actor::worldTransform() {
-    Actor *p    = dynamic_cast<Actor *>(parent());
-    if(p) {
-        return p->worldTransform() * transform();
-    }
-    return transform();
-}
-
-Vector3 Actor::worldPosition() const {
-    Actor *p    = dynamic_cast<Actor *>(parent());
-    if(p) {
-        return p->rotation().toMatrix() * (p->worldPosition() + position()) * p->scale();
-    }
-    return position();
-}
-
-Vector3 Actor::worldEuler() const {
-    Actor *p    = dynamic_cast<Actor *>(parent());
-    if(p) {
-        return p->worldEuler() + euler();
-    }
-    return euler();
-}
-
-Quaternion  Actor::worldRotation() const {
-    Actor *p  = dynamic_cast<Actor *>(parent());
-    if(p) {
-        return p->worldRotation() * rotation();
-    }
-    return rotation();
-}
-
-Vector3 Actor::worldScale() const {
-    Actor *p  = dynamic_cast<Actor *>(parent());
-    if(p) {
-        return p->worldScale() * scale();
-    }
-    return scale();
-}
-
 uint8_t Actor::layers() const {
     return m_Layers;
 }
 
-Scene &Actor::scene() const {
-    return *m_pScene;
+Transform *Actor::transform() {
+    if(m_pTransform == nullptr) {
+        m_pTransform    = component<Transform>();
+        if(m_pTransform == nullptr) {
+            m_pTransform    = addComponent<Transform>();
+        }
+    }
+    return m_pTransform;
 }
 
 Component *Actor::component(const char *type) {
@@ -98,50 +47,186 @@ Component *Actor::component(const char *type) {
     return nullptr;
 }
 
-void Actor::setPosition(const Vector3 &value) {
-    m_Position  = value;
-}
-
-void Actor::setEuler(const Vector3 &value) {
-    m_Euler = value;
-    setRotation(Quaternion(m_Euler));
-}
-
-void Actor::setRotation(const Quaternion &value) {
-    m_Rotation  = value;
-}
-
-void Actor::setScale(const Vector3 &value) {
-    m_Scale     = value;
-}
-
 void Actor::setLayers(const uint8_t layers) {
     m_Layers    = layers;
 }
 
-void Actor::setScene(Scene &scene) {
-    m_pScene = &scene;
+Component *Actor::addComponent(const string &type) {
+    return static_cast<Component *>(Engine::objectCreate(type, type, this));
 }
 
-Component *Actor::addComponent(const string &name) {
-    return static_cast<Component *>(Engine::objectCreate(name, name, this));
+void Actor::addChild(Object *value) {
+    Object::addChild(value);
+
+    Transform *t    = dynamic_cast<Transform *>(value);
+    if(t) {
+        if(m_pTransform != nullptr) {
+            delete m_pTransform;
+        }
+        m_pTransform    = t;
+    }
+}
+
+bool Actor::isSerializable() const {
+    Actor *actor   = dynamic_cast<Actor *>(parent());
+    if(actor) {
+        return !actor->isPrefab();
+    }
+    return true;
 }
 
 void Actor::setParent(Object *parent) {
-    Vector3 p   = worldPosition();
-    Vector3 e   = worldEuler();
-    Vector3 s   = worldScale();
+    Transform *t    = transform();
+    if(t) {
+        Vector3 p   = t->worldPosition();
+        Vector3 e   = t->worldEuler();
+        Vector3 s   = t->worldScale();
 
-    Object::setParent(parent);
+        Object::setParent(parent);
 
-    Actor *actor   = dynamic_cast<Actor *>(parent);
-    if(actor) {
-        p   = actor->worldRotation().inverse() * (p - actor->worldPosition()) * s;
-        e   = e - actor->worldEuler();
-        s   = s * actor->worldScale();
+        Actor *actor   = dynamic_cast<Actor *>(parent);
+        if(actor) {
+            Transform *par  = actor->transform();
+            if(par) {
+                Vector3 scale   = par->worldScale();
+                scale   = Vector3(1.0 / scale.x, 1.0 / scale.y, 1.0 / scale.z);
+
+                p   = par->worldRotation().inverse() * ((p - par->worldPosition()) * scale);
+                e   = e - par->worldEuler();
+                s   = s * scale;
+            }
+        }
+
+        t->setPosition(p);
+        t->setEuler(e);
+        t->setScale(s);
+    } else {
+        Object::setParent(parent);
     }
+}
 
-    setPosition(p);
-    setEuler(e);
-    setScale(s);
+bool Actor::isPrefab() const {
+    return (m_pPrefab != nullptr);
+}
+
+void Actor::setPrefab(Actor *prefab) {
+    m_pPrefab   = prefab;
+}
+
+typedef list<Object *> List;
+void enumObjects(Object *object, List &list) {
+    PROFILE_FUNCTION()
+    list.push_back(object);
+    for(const auto &it : object->getChildren()) {
+        enumObjects(it, list);
+    }
+}
+
+void Actor::loadUserData(const VariantMap &data) {
+    auto it = data.find(PREFAB);
+    if(it != data.end()) {
+        setPrefab(Engine::loadResource<Actor>((*it).second.toString()));
+        Actor *actor    = static_cast<Actor *>(m_pPrefab->clone());
+
+        Object::ObjectList list = actor->getChildren();
+        for(auto &it : list) {
+            it->setParent(this);
+        }
+        delete actor;
+
+        it  = data.find(DATA);
+        if(it != data.end()) {
+            List objects;
+            enumObjects(this, objects);
+
+            typedef unordered_map<uint32_t, Object *> ObjectMap;
+            ObjectMap cache;
+            for(auto &it : objects) {
+                cache[it->clonedFrom()] = it;
+            }
+
+            const VariantList &list = (*it).second.toList();
+            for(auto &it : list) {
+                const VariantList &fields   = it.toList();
+
+                uint32_t cloned = fields.front().toInt();
+                auto object = cache.find(cloned);
+                if(object != cache.end()) {
+                    const MetaObject *meta = (*object).second->metaObject();
+                    for(auto &property : fields.back().toMap()) {
+                        int32_t index   = meta->indexOfProperty(property.first.c_str());
+                        if(index > -1) {
+                             meta->property(index).write((*object).second, property.second);
+                        }
+
+                    }
+                }
+            }
+        }
+    }
+}
+
+typedef list<const Object *> ConstList;
+void enumConstObjects(const Object *object, ConstList &list) {
+    PROFILE_FUNCTION()
+    list.push_back(object);
+    for(const auto &it : object->getChildren()) {
+        enumConstObjects(it, list);
+    }
+}
+
+VariantMap Actor::saveUserData() const {
+    VariantMap result   = Object::saveUserData();
+    if(m_pPrefab) {
+        string ref      = Engine::reference(m_pPrefab);
+        if(!ref.empty()) {
+            result[PREFAB]  = ref;
+
+            ConstList prefabs;
+            enumConstObjects(m_pPrefab, prefabs);
+
+            typedef unordered_map<uint32_t, const Object *> ObjectMap;
+            ObjectMap cache;
+            for(auto it : prefabs) {
+                cache[it->uuid()] = it;
+            }
+            VariantList list;
+
+            ConstList objects;
+            enumConstObjects(this, objects);
+            for(auto it : objects) {
+                int32_t cloned  = it->clonedFrom();
+                if(cloned) {
+                    auto fab = cache.find(cloned);
+                    if(fab != cache.end()) {
+                        VariantMap map;
+
+                        const MetaObject *meta = it->metaObject();
+                        int count  = meta->propertyCount();
+                        for(int i = 0; i < count; i++) {
+                            MetaProperty lp = (*fab).second->metaObject()->property(i);
+                            MetaProperty rp = meta->property(i);
+                            Variant lv  = lp.read((*fab).second);
+                            Variant rv  = rp.read(it);
+                            if(lv != rv) {
+                                map[rp.name()]  = rv;
+                            }
+                        }
+
+                        if(!map.empty()) {
+                            VariantList array;
+                            array.push_back(cloned);
+                            array.push_back(map);
+                            list.push_back(array);
+                        }
+                    }
+                }
+            }
+
+            if(!list.empty()) {
+                result[DATA] = list;
+            }
+        }
+    }
+    return result;
 }

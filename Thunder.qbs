@@ -81,11 +81,12 @@ Project {
     references: [
         "thirdparty/thirdparty.qbs",
         "engine/engine.qbs",
+        "modules/media/media.qbs",
         "modules/renders/rendergl/rendergl.qbs",
+        "modules/vms/angel/angel.qbs",
         "worldeditor/worldeditor.qbs",
         "builder/builder.qbs",
-        "build/install.qbs",
-        "build/archive.qbs"
+        "build/install.qbs"
     ]
 }
 

@@ -8,7 +8,7 @@
 class Engine;
 class Scene;
 class Actor;
-class AOBox;
+class Camera;
 
 class IController;
 class ISystem;
@@ -19,11 +19,11 @@ class QOpenGLFramebufferObject;
 
 class IconRender : public QObject {
 public:
-    IconRender                  (Engine *engine, QOpenGLContext *share, QObject *parent = 0);
+    IconRender                  (Engine *engine, QOpenGLContext *share, QObject *parent = nullptr);
 
     ~IconRender                 ();
 
-    const QImage                render              (const QString &resource, uint8_t type);
+    const QImage                render              (const QString &resource, uint32_t type);
 
 protected:
 
@@ -39,11 +39,13 @@ protected:
 
     Scene                      *m_pScene;
 
-    Actor                      *m_pCamera;
+    Actor                      *m_pActor;
 
     Actor                      *m_pLight;
 
     IController                *m_pController;
+
+    Camera                     *m_pCamera;
 };
 
 #endif // ICONRENDER_H

@@ -6,6 +6,8 @@
 
 #include "controllers/objectctrl.h"
 
+UndoManager *UndoManager::m_pInstance   = nullptr;
+
 UndoManager::SelectObjects::SelectObjects(const Object::ObjectList &objects, ObjectCtrl *ctrl, const QString &name) :
         UndoObject(ctrl, name) {
     for(auto it : objects) {
@@ -35,7 +37,7 @@ void UndoManager::CreateObjects::undo(bool redo) {
     if(!m_Objects.empty()) {
         Object::ObjectList objects;
         foreach(const QString &ref, m_Objects) {
-            Object *object  = m_pController->findObject(ref.toInt());
+            Object *object  = m_pController->findObject(ref.toUInt());
             if(object) {
                 objects.push_back(object);
             }
@@ -69,10 +71,10 @@ void UndoManager::DestroyObjects::undo(bool redo) {
     for(auto ref : list) {
         Object *object  = Engine::toObject(ref);
         if(object) {
-            object->setParent(m_pController->findObject((*it).toInt()));
+            object->setParent(m_pController->findObject((*it).toUInt()));
             objects.push_back(object);
         }
-        it++;
+        ++it;
     }
     m_pController->mapUpdated();
     if(!objects.empty()) {
@@ -84,7 +86,7 @@ void UndoManager::DestroyObjects::undo(bool redo) {
             if(comp) {
                 *it = comp->parent();
             }
-            it++;
+            ++it;
         }
         m_pController->onSelectActor(objects, false);
     }
@@ -106,13 +108,13 @@ void UndoManager::ParentingObjects::undo(bool redo) {
 
     QStringList::iterator it    = m_Parents.begin();
     foreach(const QString &ref, m_Objects) {
-        Object *object  = m_pController->findObject(ref.toInt());
-        Object *parent  = m_pController->findObject((*it).toInt());
+        Object *object  = m_pController->findObject(ref.toUInt());
+        Object *parent  = m_pController->findObject((*it).toUInt());
         if(object && parent) {
             objects.push_back(object);
             parents.push_back(parent);
         }
-        it++;
+        ++it;
     }
     UndoManager::instance()->push(new ParentingObjects(objects, parents, m_pController, m_Name), !redo, false);
     m_pController->onParentActor(objects, parents, false);
@@ -194,6 +196,18 @@ void UndoManager::PropertyObjects::undo(bool redo) {
 }
 bool UndoManager::PropertyObjects::isValid() const {
     return !m_Dump.empty();
+}
+
+UndoManager *UndoManager::instance() {
+    if(!m_pInstance) {
+        m_pInstance = new UndoManager;
+    }
+    return m_pInstance;
+}
+
+void UndoManager::destroy() {
+    delete m_pInstance;
+    m_pInstance = nullptr;
 }
 
 void UndoManager::init() {

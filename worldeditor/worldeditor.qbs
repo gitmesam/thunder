@@ -3,6 +3,7 @@ import qbs
 Project {
     id: worldEditor
     property stringList srcFiles: [
+        "src/**/*.qml",
         "src/**/*.ui",
         "src/**/*.cpp",
         "src/**/*.h",
@@ -22,15 +23,22 @@ Project {
         "../develop/managers/codemanager/include",
         "../develop/managers/projectmanager/include",
         "../develop/managers/assetmanager/include",
+        "../develop/managers/pluginmanager/include",
         "../develop/models/include",
         "../modules/renders/rendergl/includes",
+        "../modules/media/includes",
         "../thirdparty/next/inc",
         "../thirdparty/next/inc/math",
         "../thirdparty/next/inc/core",
+        "../thirdparty/next/inc/anim",
         "../thirdparty/physfs/inc",
         "../thirdparty/glfw/inc",
         "../thirdparty/fbx/inc",
-        "../thirdparty/zlib/src"
+        "../thirdparty/zlib/src",
+        "../thirdparty/libogg/src",
+        "../thirdparty/libvorbis/src",
+        "../thirdparty/glsl",
+        "../thirdparty/spirvcross/src"
     ]
 
     QtGuiApplication {
@@ -41,10 +49,13 @@ Project {
         Depends { name: "cpp" }
         Depends { name: "zlib-editor" }
         Depends { name: "next-editor" }
+        Depends { name: "vorbis-editor" }
+        Depends { name: "ogg-editor" }
         Depends { name: "engine-editor" }
         Depends { name: "rendergl-editor" }
-        Depends { name: "Qt"; submodules: ["core", "gui", "widgets"]; }
-
+        Depends { name: "glsl" }
+        Depends { name: "spirvcross" }
+        Depends { name: "Qt"; submodules: ["core", "gui", "widgets", "multimedia", "quickwidgets"]; }
         property bool isBundle: qbs.targetOS.contains("darwin") && bundle.isBundle
         bundle.infoPlist: ({
             "NSHumanReadableCopyright": "(C) 2007-" + worldEditor.COPYRIGHT_YEAR + " by " + worldEditor.COPYRIGHT_AUTHOR
@@ -53,7 +64,12 @@ Project {
 
         consoleApplication: false
 
-        cpp.defines: worldEditor.defines
+        cpp.defines: {
+            var result  = worldEditor.defines
+            result.push("NEXT_SHARED")
+            return result
+        }
+
         cpp.includePaths: worldEditor.incPaths
         cpp.libraryPaths: [
             "../thirdparty/fbx/lib"
@@ -70,6 +86,11 @@ Project {
                 "opengl32",
                 "glu32"
             ])
+        }
+
+        Properties {
+            condition: qbs.targetOS.contains("linux")
+            cpp.rpaths: "$ORIGIN"
         }
 
         Properties {

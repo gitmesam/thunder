@@ -4,11 +4,15 @@
 #include <QObject>
 #include <QMouseEvent>
 
-#include <controller.h>
+#include <amath.h>
 
 class Actor;
+class Scene;
+class Camera;
 
-class CameraCtrl : public QObject, public IController {
+class QOpenGLWidget;
+
+class CameraCtrl : public QObject {
     Q_OBJECT
 
 public:
@@ -21,9 +25,9 @@ public:
     };
 
 public:
-    CameraCtrl                          ();
+    CameraCtrl                          (QOpenGLWidget *view);
 
-    void                                init                        (Scene *);
+    void                                init                        (Scene *scene);
 
     void                                update                      ();
 
@@ -31,21 +35,27 @@ public:
 
     void                                setFocusOn                  (Actor *actor, float &bottom);
 
+    void                                setFree                     (bool flag) { mCameraFree   = flag; }
+
     void                                blockMovement               (bool flag) { mBlockMove    = flag; }
 
     void                                blockRotations              (bool flag) { mBlockRot     = flag; }
 
-    void                                blockFree                   (bool flag) { mBlockFree    = flag; }
-
     virtual void                        resize                      (uint32_t, uint32_t) {}
+
+    Camera                             *camera                      () const { return m_pActiveCamera; }
 
 public slots:
     virtual void                        onInputEvent                (QInputEvent *);
 
-protected:
-    void                                cameraRotate                (const Quaternion  &q);
+    virtual void                        onOrthographic              (bool flag);
 
+protected:
     void                                cameraZoom                  (float delta);
+
+    void                                cameraRotate                (const Vector3 &delta);
+
+    void                                cameraMove                  (const Vector3 &delta);
 
 protected:
     uint8_t                             mCameraMove;
@@ -53,15 +63,17 @@ protected:
 
     bool                                mBlockMove;
     bool                                mBlockRot;
-    bool                                mBlockFree;
 
-    Vector3                           mCameraSpeed;
+    Vector3                             mCameraSpeed;
+    Quaternion                          mRotation;
 
     QPoint                              mSaved;
 
-    Vector3                           mRotation;
-
     Actor                              *m_pCamera;
+
+    QOpenGLWidget                      *m_pView;
+
+    Camera                             *m_pActiveCamera;
 };
 
 #endif // CAMERACTRL_H

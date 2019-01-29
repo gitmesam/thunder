@@ -24,7 +24,7 @@ StringList IFile::_flist(const char *path) {
     char **i;
 
     StringList result;
-    for(i = rc; *i != NULL; i++) {
+    for(i = rc; *i != nullptr; i++) {
         result.push_back(*i);
     }
 
@@ -58,6 +58,7 @@ int IFile::_fclose(_FILE *stream) {
 }
 
 _size_t IFile::_fseek(_FILE *stream, long int offset, int origin) {
+    A_UNUSED(origin)
     return PHYSFS_seek((PHYSFS_file *)stream, offset);
 }
 
@@ -69,7 +70,7 @@ _FILE *IFile::_fopen(const char *path, const char *mode) {
         case 'a': result    = (void *)PHYSFS_openAppend(path); break;
         default: break;
     }
-    if(result == 0) {
+    if(result == nullptr) {
         Log(Log::ERR) << "[ FileIO ] Can't open file" << path << PHYSFS_getLastError();
     }
     return result;

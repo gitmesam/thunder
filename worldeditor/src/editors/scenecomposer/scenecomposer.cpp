@@ -13,17 +13,16 @@
 #include <json.h>
 #include <bson.h>
 
-#if __linux__
 #include <cstring>
-#endif
 
 // Engine
 #include <module.h>
 #include <timer.h>
-#include <components/chunk.h>
 #include <components/actor.h>
+#include <components/transform.h>
 #include <components/spritemesh.h>
 #include <components/staticmesh.h>
+#include <components/camera.h>
 
 #include <analytics/profiler.h>
 
@@ -35,25 +34,19 @@
 #include "managers/pluginmanager/plugindialog.h"
 #include "managers/configmanager/configdialog.h"
 
-#include "assetmanager.h"
 #include "projectmanager.h"
-
+#include "pluginmodel.h"
 #include "aboutdialog.h"
 
 // System
-#include "common.h"
+#include <global.h>
 #include "qlog.h"
 
 // Editors
 #include "editors/propertyedit/nextobject.h"
-#include "editors/contentbrowser/contentlist.h"
 #include "editors/componentbrowser/componentmodel.h"
-#include "editors/textureedit/textureedit.h"
-#include "editors/materialedit/materialedit.h"
-#include "editors/meshedit/meshedit.h"
 
-#include "managers/asseteditormanager/importqueue.h"
-#include "managers/asseteditormanager/iconrender.h"
+#include "graph/handles.h"
 
 #define FPS         "FPS"
 #define VERTICES    "Vertices"
@@ -62,11 +55,15 @@
 
 Q_DECLARE_METATYPE(Object *)
 Q_DECLARE_METATYPE(Actor *)
+Q_DECLARE_METATYPE(Object::ObjectList *)
+
+const QString gRecent("Recent");
 
 SceneComposer::SceneComposer(Engine *engine, QWidget *parent) :
         QMainWindow(parent),
-        m_pImportQueue(new ImportQueue()),
-        ui(new Ui::SceneComposer) {
+        ui(new Ui::SceneComposer),
+        m_pProperties(nullptr),
+        m_pMap(nullptr) {
 
     qRegisterMetaType<Vector2>  ("Vector2");
     qRegisterMetaType<Vector3>  ("Vector3");
@@ -85,34 +82,36 @@ SceneComposer::SceneComposer(Engine *engine, QWidget *parent) :
 
     m_pEngine   = engine;
 
-    QLog *log   = new QLog();
-    connect(log, SIGNAL(postRecord(uint8_t, const QString &)), ui->consoleOutput, SLOT(onLogRecord(uint8_t, const QString &)));
-    Log::overrideHandler(log);
-    Log::setLogLevel(Log::DBG);
+    QLog *handler = static_cast<QLog *>(Log::handler());
+    connect(handler, SIGNAL(postRecord(uint8_t, const QString &)), ui->consoleOutput, SLOT(onLogRecord(uint8_t, const QString &)));
 
     cmToolbars      = new QMenu(this);
 
-    m_pPluginDlg    = new PluginDialog(m_pEngine, this);
-    connect(m_pPluginDlg, SIGNAL(updated()), ComponentModel::instance(), SLOT(update()));
-
     ObjectCtrl *ctl = new ObjectCtrl(ui->viewport);
-    connect(ui->viewport, SIGNAL(drop(QDropEvent*)), ctl, SLOT(onDrop()));
-    connect(ui->viewport, SIGNAL(dragEnter(QDragEnterEvent *)), ctl, SLOT(onDragEnter(QDragEnterEvent *)));
-    connect(ui->viewport, SIGNAL(dragLeave(QDragLeaveEvent *)), ctl, SLOT(onDragLeave(QDragLeaveEvent *)));
 
     ui->viewport->setController(ctl);
-    ui->viewport->setScene(Engine::objectCreate<Scene>("Scene"));
-    ui->viewport->setWindowTitle("Viewport");
+    ui->viewport->setScene(m_pEngine->scene());
 
-    ui->preview->setController(new IController());
-    ui->preview->setScene(ui->viewport->scene());
+    ui->preview->setController(new CameraCtrl(ui->preview));
+    ui->preview->setScene(m_pEngine->scene());
     ui->preview->setWindowTitle("Preview");
 
+    Input::instance()->init(ui->preview);
+
+    ui->viewportWidget->setWindowTitle("Viewport");
     ui->propertyWidget->setWindowTitle("Properties");
     ui->projectWidget->setWindowTitle("Project Settings");
+    ui->timeline->setWindowTitle("Timeline");
 
     ui->commitButton->setProperty("green", true);
     ui->componentButton->setProperty("blue", true);
+    ui->moveButton->setProperty("blue", true);
+    ui->rotateButton->setProperty("blue", true);
+    ui->scaleButton->setProperty("blue", true);
+
+    ui->moveButton->setProperty("checkred", true);
+    ui->rotateButton->setProperty("checkred", true);
+    ui->scaleButton->setProperty("checkred", true);
 
     ComponentBrowser *comp  = new ComponentBrowser(this);
     QMenu *menu = new QMenu(ui->componentButton);
@@ -120,7 +119,7 @@ SceneComposer::SceneComposer(Engine *engine, QWidget *parent) :
     action->setDefaultWidget(comp);
     menu->addAction(action);
     ui->componentButton->setMenu(menu);
-    connect(comp, SIGNAL(componentSelected(QString)), ctl, SLOT(onComponentSelected(QString)));
+    connect(comp, SIGNAL(componentSelected(QString)), ctl, SLOT(onCreateSelected(QString)));
     connect(comp, SIGNAL(componentSelected(QString)), menu, SLOT(hide()));
 
     comp->setGroups(QStringList("Components"));
@@ -128,16 +127,17 @@ SceneComposer::SceneComposer(Engine *engine, QWidget *parent) :
 
     connect(ui->commitButton, SIGNAL(clicked(bool)), ProjectManager::instance(), SLOT(saveSettings()));
 
-    connect(ui->viewport, SIGNAL(inited()), this, SLOT(onGLInit()));
+    connect(ui->viewport, SIGNAL(inited()), this, SLOT(onGLInit()), Qt::DirectConnection);
     startTimer(16);
 
-    ui->centralwidget->addToolWindow(ui->viewport, QToolWindowManager::EmptySpaceArea);
+    ui->centralwidget->addToolWindow(ui->viewportWidget, QToolWindowManager::EmptySpaceArea);
     ui->centralwidget->addToolWindow(ui->preview, QToolWindowManager::EmptySpaceArea);
-    ui->centralwidget->addToolWindow(ui->contentBrowser, QToolWindowManager::ReferenceBottomOf, ui->centralwidget->areaFor(ui->viewport));
-    ui->centralwidget->addToolWindow(ui->hierarchy, QToolWindowManager::ReferenceRightOf, ui->centralwidget->areaFor(ui->viewport));
+    ui->centralwidget->addToolWindow(ui->contentBrowser, QToolWindowManager::ReferenceBottomOf, ui->centralwidget->areaFor(ui->viewportWidget));
+    ui->centralwidget->addToolWindow(ui->hierarchy, QToolWindowManager::ReferenceRightOf, ui->centralwidget->areaFor(ui->viewportWidget));
     ui->centralwidget->addToolWindow(ui->propertyWidget, QToolWindowManager::ReferenceBottomOf, ui->centralwidget->areaFor(ui->hierarchy));
-    ui->centralwidget->addToolWindow(ui->components, QToolWindowManager::ReferenceLeftOf, ui->centralwidget->areaFor(ui->viewport));
+    ui->centralwidget->addToolWindow(ui->components, QToolWindowManager::ReferenceLeftOf, ui->centralwidget->areaFor(ui->viewportWidget));
     ui->centralwidget->addToolWindow(ui->consoleOutput, QToolWindowManager::ReferenceRightOf, ui->centralwidget->areaFor(ui->contentBrowser));
+    ui->centralwidget->addToolWindow(ui->timeline, QToolWindowManager::ReferenceRightOf, ui->centralwidget->areaFor(ui->contentBrowser));
     ui->centralwidget->addToolWindow(ui->projectWidget, QToolWindowManager::NoArea);
 
     ui->actionAbout->setText(tr("About %1...").arg(EDITOR_NAME));
@@ -156,31 +156,41 @@ SceneComposer::SceneComposer(Engine *engine, QWidget *parent) :
 
     connect(ctl, SIGNAL(mapUpdated()), ui->hierarchy, SLOT(onHierarchyUpdated()));
     connect(ctl, SIGNAL(objectsSelected(Object::ObjectList)), this, SLOT(onObjectSelected(Object::ObjectList)));
-    connect(ctl, SIGNAL(objectsSelected(Object::ObjectList)), ui->hierarchy, SLOT(onSelected(Object::ObjectList)));
-    connect(ctl, SIGNAL(mapUpdated()), this, SLOT(onModified()));
-    connect(ctl, SIGNAL(objectsUpdated()), this, SLOT(onModified()));
+    connect(ctl, SIGNAL(objectsSelected(Object::ObjectList)), ui->hierarchy, SLOT(onObjectSelected(Object::ObjectList)));
+    connect(ctl, SIGNAL(objectsSelected(Object::ObjectList)), ui->timeline, SLOT(onObjectSelected(Object::ObjectList)));
+    connect(ctl, SIGNAL(mapUpdated()), this, SLOT(onUpdated()));
+    connect(ctl, SIGNAL(objectsUpdated()), this, SLOT(onUpdated()));
+    connect(ctl, SIGNAL(loadMap(QString)), this, SLOT(on_action_Open_triggered(QString)));
     connect(ui->hierarchy, SIGNAL(selected(Object::ObjectList)), ctl, SLOT(onSelectActor(Object::ObjectList)));
     connect(ui->hierarchy, SIGNAL(removed(Object::ObjectList)), ctl, SLOT(onRemoveActor(Object::ObjectList)));
     connect(ui->hierarchy, SIGNAL(parented(Object::ObjectList, Object::ObjectList)), ctl, SLOT(onParentActor(Object::ObjectList,Object::ObjectList)));
     connect(ui->hierarchy, SIGNAL(focused(Object*)), ctl, SLOT(onFocusActor(Object*)));
+    connect(ui->orthoButton,SIGNAL(toggled(bool)), ctl, SLOT(onOrthographic(bool)));
+    connect(ui->moveButton,     SIGNAL(clicked()), ctl, SLOT(onMoveActor()));
+    connect(ui->rotateButton,   SIGNAL(clicked()), ctl, SLOT(onRotateActor()));
+    connect(ui->scaleButton,    SIGNAL(clicked()), ctl, SLOT(onScaleActor()));
+    connect(ui->renderMode,     SIGNAL(clicked()), ui->viewport, SLOT(onSetMode()));
+
+    connect(ui->timeline, SIGNAL(animated(bool)), ui->propertyView, SLOT(onAnimated(bool)));
+
+    ui->scaleButton->click();
 
     connect(UndoManager::instance(), SIGNAL(updated()), this, SLOT(onUndoRedoUpdated()));
 
     connect(ui->hierarchy, SIGNAL(updated()), ui->propertyView, SLOT(onUpdated()));
-    connect(ui->hierarchy, SIGNAL(updated()), this, SLOT(onModified()));
+    connect(ui->hierarchy, SIGNAL(updated()), this, SLOT(onUpdated()));
 
-    connect(m_pImportQueue, SIGNAL(rendered(QString)), ContentList::instance(), SLOT(onRendered(QString)));
 
-    m_pProperties   = nullptr;
-    m_pMap          = nullptr;
+
+    ui->projectSettings->setObject(ProjectManager::instance());
 
     on_actionEditor_Mode_triggered();
     on_actionResore_Layout_triggered();
+
+    on_action_New_triggered();
 }
 
 SceneComposer::~SceneComposer() {
-    AssetManager::destroy();
-
     delete m_pProperties;
 
     delete cmToolbars;
@@ -190,42 +200,66 @@ SceneComposer::~SceneComposer() {
 
 void SceneComposer::timerEvent(QTimerEvent *) {
     Timer::update();
-    ui->viewport->update();
-    ui->preview->update();
+    if(ui->actionGame_Mode->isChecked()) {
+        Engine::updateScene(ui->preview->scene());
+    }
+    ui->viewport->repaint();
+    ui->preview->repaint();
 }
 
 void SceneComposer::onObjectSelected(Object::ObjectList objects) {
     if(m_pProperties) {
         delete m_pProperties;
-        m_pProperties   = 0;
+        m_pProperties   = nullptr;
     }
     if(!objects.empty()) {
         ui->viewport->makeCurrent();
         /// \todo Don't reload mesh and materials for each repick
-        m_pProperties   = new NextObject(*objects.begin(), static_cast<ObjectCtrl *>(ui->viewport->controller()), this);
-        connect(static_cast<CameraCtrl *>(ui->viewport->controller()), SIGNAL(objectsUpdated()), m_pProperties, SLOT(onUpdated()));
-        connect(m_pPluginDlg, SIGNAL(pluginReloaded()), m_pProperties, SLOT(onUpdated()));
+        ObjectCtrl *ctl = static_cast<ObjectCtrl *>(ui->viewport->controller());
+
+        m_pProperties   = new NextObject(*objects.begin(), ctl, this);
+        connect(ctl, SIGNAL(objectsUpdated()), m_pProperties, SLOT(onUpdated()));
+        connect(ctl, SIGNAL(objectsChanged(Object::ObjectList,QString)), ui->timeline, SLOT(onChanged(Object::ObjectList,QString)));
+
+        connect(m_pProperties, SIGNAL(deleteComponent(QString)), ctl, SLOT(onDeleteComponent(QString)));
+
+        connect(PluginModel::instance(), SIGNAL(pluginReloaded(QString)), m_pProperties, SLOT(onUpdated()));
         connect(m_pProperties, SIGNAL(updated()), ui->propertyView, SLOT(onUpdated()));
-        connect(m_pProperties, SIGNAL(updated()), this, SLOT(onModified()));
+        connect(m_pProperties, SIGNAL(updated()), this, SLOT(onUpdated()));
+        connect(m_pProperties, SIGNAL(changed(Object *, QString)), ui->timeline, SLOT(onUpdated(Object *, QString)));
+
+        connect(ui->timeline, SIGNAL(moved()), m_pProperties, SLOT(onUpdated()));
     }
     ui->propertyView->setObject(m_pProperties);
 }
 
 void SceneComposer::onGLInit() {
-    m_pImportQueue->init(new IconRender(m_pEngine, ui->viewport->context()));
+    QSettings settings(COMPANY_NAME, EDITOR_NAME);
+    QVariant map = settings.value(ProjectManager::instance()->projectId());
+    if(map.isValid()) {
+        VariantList list = Json::load(map.toString().toStdString()).toList();
+        auto it = list.begin();
+        on_action_Open_triggered(it->toString().c_str());
 
-    AssetManager *asset = AssetManager::instance();
-    asset->addEditor(IConverter::ContentTexture, new TextureEdit(m_pEngine));
-    asset->addEditor(IConverter::ContentMaterial, new MaterialEdit(m_pEngine));
-    asset->addEditor(IConverter::ContentMesh, new MeshEdit(m_pEngine));
-    //asset->addEditor(IConverter::ContentEffect, new ParticleEdit(m_pEngine));
+        it++;
+        Camera *camera = Camera::current();
+        if(camera) {
+            Actor *actor = camera->actor();
+            Transform *t = actor->transform();
+            t->setPosition(it->toVector3());
+            it++;
+            t->setEuler(it->toVector3());
+            it++;
+            ui->orthoButton->setChecked(it->toBool());
+            it++;
+            camera->setFocal(it->toFloat());
+            it++;
+            camera->setOrthoWidth(it->toFloat());
+            it++;
+        }
+    }
 
-    ComponentModel::instance()->init(m_pEngine);
-    ContentList::instance()->init(m_pEngine);
-
-    ui->projectSettings->setObject(ProjectManager::instance());
-
-    on_action_New_triggered();
+    Handles::init();
 }
 
 void SceneComposer::updateTitle() {
@@ -237,11 +271,33 @@ void SceneComposer::updateTitle() {
 }
 
 void SceneComposer::closeEvent(QCloseEvent *event) {
+    QMainWindow::closeEvent(event);
+
     if(!checkSave()) {
         event->ignore();
         return;
     }
-    QMainWindow::closeEvent(event);
+
+    QString str = ProjectManager::instance()->projectId();
+    if(!str.isEmpty() && !mPath.isEmpty()) {
+        VariantList params;
+        params.push_back(qPrintable(mPath));
+        Camera *camera  = ui->viewport->controller()->camera();
+        if(camera) {
+            Actor *actor = camera->actor();
+            Transform *t = actor->transform();
+            params.push_back(t->position());
+            params.push_back(t->euler());
+            params.push_back(ui->orthoButton->isChecked());
+            params.push_back(camera->focal());
+            params.push_back(camera->orthoWidth());
+        }
+
+        QSettings settings(COMPANY_NAME, EDITOR_NAME);
+        settings.setValue(str, QString::fromStdString(Json::save(params)));
+    }
+
+    QApplication::quit();
 }
 
 bool SceneComposer::checkSave() {
@@ -269,10 +325,10 @@ void SceneComposer::on_action_New_triggered() {
 
     delete m_pMap;
 
-    m_pMap  = Engine::objectCreate<Chunk>("Chunk", ui->viewport->scene());
+    m_pMap  = Engine::objectCreate<Actor>("Chunk", m_pEngine->scene());
     ui->hierarchy->setObject(m_pMap);
 
-    ObjectCtrl * ctrl   = static_cast<ObjectCtrl *>(ui->viewport->controller());
+    ObjectCtrl *ctrl    = static_cast<ObjectCtrl *>(ui->viewport->controller());
 
     ctrl->clear();
     ctrl->setMap(m_pMap);
@@ -281,16 +337,21 @@ void SceneComposer::on_action_New_triggered() {
     onUndoRedoUpdated();
 
     mPath.clear();
+    updateTitle();
 }
 
-void SceneComposer::on_action_Open_triggered() {
+void SceneComposer::on_action_Open_triggered(const QString &arg) {
     checkSave();
+    if(arg.isEmpty()) {
+        QString dir = ProjectManager::instance()->contentPath();
+        mPath       = QFileDialog::getOpenFileName(this,
+                                                   tr("Open Map"),
+                                                   dir + "/maps",
+                                                   tr("Maps (*.map)") );
+    } else {
+        mPath   = arg;
+    }
 
-    QString dir = ProjectManager::instance()->contentPath();
-    mPath       = QFileDialog::getOpenFileName(this,
-                                               tr("Open Map"),
-                                               dir + "/maps",
-                                               tr("Maps (*.map)") );
     if( !mPath.isEmpty() ) {
         QFile loadFile(mPath);
         if (!loadFile.open(QIODevice::ReadOnly)) {
@@ -323,7 +384,7 @@ void SceneComposer::on_action_Open_triggered() {
 }
 
 void SceneComposer::on_actionSave_triggered() {
-    if(m_pMap) {
+    if(m_pMap && !ui->actionGame_Mode->isChecked()) {
         if( mPath.length() > 0 ) {
             QDir dir    = QDir(QDir::currentPath());
 
@@ -337,6 +398,8 @@ void SceneComposer::on_actionSave_triggered() {
         } else {
             on_actionSave_As_triggered();
         }
+    } else {
+        QApplication::beep();
     }
 }
 
@@ -354,37 +417,35 @@ void SceneComposer::on_actionSave_As_triggered() {
 }
 
 void SceneComposer::on_actionPlugin_Manager_triggered() {
-    m_pPluginDlg->exec();
+    PluginDialog(this).exec();
 }
 
 void SceneComposer::on_actionEditor_Mode_triggered() {
     ui->actionEditor_Mode->setChecked(true);
     ui->actionGame_Mode->setChecked(false);
 
-    ui->preview->stopGame();
     ui->centralwidget->activateToolWindow(ui->viewport);
-    uint32_t offset = 0;
-    Object *map = Engine::toObject(Bson::load(m_Back, offset));
+    Object *map = Engine::toObject(Bson::load(m_Back));
     if(map) {
-        map->setParent(ui->viewport->scene());
         delete m_pMap;
         m_pMap  = map;
-        ui->hierarchy->setObject(m_pMap);
-        ObjectCtrl * ctrl   = static_cast<ObjectCtrl *>(ui->viewport->controller());
 
+        map->setParent(ui->viewport->scene());
+        ui->hierarchy->setObject(m_pMap);
+
+        ObjectCtrl *ctrl  = static_cast<ObjectCtrl *>(ui->viewport->controller());
         ctrl->clear();
         ctrl->setMap(m_pMap);
     }
 }
 
 void SceneComposer::on_actionGame_Mode_triggered() {
+    if(ui->actionEditor_Mode->isChecked()) {
+        m_Back  = Bson::save(Engine::toVariant(m_pMap));
+        ui->centralwidget->activateToolWindow(ui->preview);
+    }
     ui->actionGame_Mode->setChecked(true);
     ui->actionEditor_Mode->setChecked(false);
-
-    m_Back  = Bson::save(Engine::toVariant(m_pMap));
-
-    ui->preview->startGame();
-    ui->centralwidget->activateToolWindow(ui->preview);
 }
 
 void SceneComposer::on_actionTake_Screenshot_triggered() {
@@ -440,7 +501,7 @@ void SceneComposer::on_actionResore_Layout_triggered() {
     ui->centralwidget->restoreState(settings.value("main.windows"));
 }
 
-void SceneComposer::onModified() {
+void SceneComposer::onUpdated() {
     mModified   = true;
 }
 

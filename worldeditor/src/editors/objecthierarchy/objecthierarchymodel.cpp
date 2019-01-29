@@ -3,11 +3,15 @@
 #include <QUrl>
 #include <QSize>
 
-#include <object.h>
+#include "components/actor.h"
 
 ObjectHierarchyModel::ObjectHierarchyModel(QObject *parent) :
         QAbstractItemModel(parent),
-        m_rootItem(nullptr) {
+        m_rootItem(nullptr),
+        m_Visible(QPixmap(":/Images/fontawesome/eye.png")),
+        m_Invisible() {
+
+
 }
 
 void ObjectHierarchyModel::setRoot(Object *scene) {
@@ -16,7 +20,7 @@ void ObjectHierarchyModel::setRoot(Object *scene) {
 
 Object *ObjectHierarchyModel::findObject(const QString &ref) {
     QUrl path(ref);
-    return m_rootItem->find(path.path().toStdString()); // \todo Review need to check this on errors
+    return m_rootItem->find(path.path().toStdString()); /// \todo Review need to check this on errors
 }
 
 void ObjectHierarchyModel::reset() {
@@ -28,7 +32,7 @@ QVariant ObjectHierarchyModel::data(const QModelIndex &index, int role) const {
     if(!index.isValid()) {
         return QVariant();
     }
-    Object *item    = static_cast<Object* >(index.internalPointer());
+    Actor *item = static_cast<Actor* >(index.internalPointer());
     switch(role) {
         case Qt::EditRole:
         case Qt::ToolTipRole:
@@ -36,8 +40,12 @@ QVariant ObjectHierarchyModel::data(const QModelIndex &index, int role) const {
             switch(index.column()) {
                 case 0: return QString::fromStdString(item->name());
                 case 1: return QString::fromStdString(item->typeName());
-                case 2: return true;//item->isEnable();
                 default: break;
+            }
+        } break;
+        case Qt::DecorationRole: {
+            if(index.column() == 2) {
+                return item->isEnable() ? m_Visible : m_Invisible;
             }
         } break;
         case Qt::SizeHintRole: {
@@ -120,8 +128,11 @@ QModelIndex ObjectHierarchyModel::parent(const QModelIndex &index) const {
         return QModelIndex();
     }
     QList<Object *> list;
-    for(auto it : parentItem->parent()->getChildren()) {
-        list.push_back(it);
+    Object *p   = parentItem->parent();
+    if(p) {
+        for(auto it : p->getChildren()) {
+            list.push_back(it);
+        }
     }
     return createIndex(list.indexOf(parentItem), 0, parentItem);
 }

@@ -3,12 +3,11 @@
 #include "ui_propertyeditor.h"
 
 #include "propertymodel.h"
+#include "nextobject.h"
 #include "custom/Property.h"
 
-#include "nextobject.h"
 #include "custom/BoolProperty.h"
 #include "custom/StringProperty.h"
-#include "custom/Vector2DProperty.h"
 #include "custom/Vector3DProperty.h"
 #include "custom/FilePathProperty.h"
 #include "custom/AssetProperty.h"
@@ -17,6 +16,8 @@
 #include <QSortFilterProxyModel>
 #include <QStyledItemDelegate>
 #include <QSignalMapper>
+
+#include <QMenu>
 
 Property *createCustomProperty(const QString &name, QObject *propertyObject, Property *parent) {
     int userType = 0;
@@ -30,9 +31,6 @@ Property *createCustomProperty(const QString &name, QObject *propertyObject, Pro
     if(userType == QMetaType::QString)
         return new StringProperty(name, propertyObject, parent);
 
-    if(userType == QMetaType::type("Vector2"))
-        return new Vector2DProperty(name, propertyObject, parent);
-
     if(userType == QMetaType::type("Vector3"))
         return new Vector3DProperty(name, propertyObject, parent);
 
@@ -45,7 +43,7 @@ Property *createCustomProperty(const QString &name, QObject *propertyObject, Pro
     if(userType == QMetaType::type("Template"))
         return new TemplateProperty(name, propertyObject, parent);
 
-    return 0;
+    return nullptr;
 }
 
 class PropertyFilter : public QSortFilterProxyModel {
@@ -77,7 +75,7 @@ protected:
 
 class PropertyDelegate : public QStyledItemDelegate {
 public:
-    explicit PropertyDelegate(QObject *parent = 0) :
+    explicit PropertyDelegate(QObject *parent = nullptr) :
         QStyledItemDelegate(parent) {
 
         m_finishedMapper    = new QSignalMapper(this);
@@ -108,13 +106,15 @@ public:
 
     virtual void setEditorData(QWidget *editor, const QModelIndex &index) const {
         m_finishedMapper->blockSignals(true);
-        QModelIndex origin  = static_cast<const QSortFilterProxyModel *>(index.model())->mapToSource(index);
-        QVariant data   = origin.model()->data(origin, Qt::EditRole);
+        if(index.isValid()) {
+            const QSortFilterProxyModel *model = static_cast<const QSortFilterProxyModel *>(index.model());
+            QModelIndex origin  = model->mapToSource(index);
+            QVariant data   = origin.model()->data(origin, Qt::EditRole);
 
-        if(!static_cast<Property *>(origin.internalPointer())->setEditorData(editor, data)) {
-            QStyledItemDelegate::setEditorData(editor, index);
+            if(!static_cast<Property *>(origin.internalPointer())->setEditorData(editor, data)) {
+                QStyledItemDelegate::setEditorData(editor, index);
+            }
         }
-
         m_finishedMapper->blockSignals(false);
     }
 
@@ -134,16 +134,9 @@ public:
         QSize result    = QStyledItemDelegate::sizeHint(option, index);
         if(origin.isValid()) {
             Property *p     = static_cast<Property *>(origin.internalPointer());
-            return p->sizeHint(result);
+            result  = p->sizeHint(result);
         }
         return result;
-    }
-
-    virtual void initStyleOption(QStyleOptionViewItem *option, const QModelIndex &index) const {
-        QStyledItemDelegate::initStyleOption(option, index);
-        if(index.data().type() == QMetaType::Bool) {
-            //option->text    = "";
-        }
     }
 
 private:
@@ -163,18 +156,19 @@ private:
     }
 
     QSignalMapper *m_finishedMapper;
-
 };
 
 PropertyEditor::PropertyEditor(QWidget *parent) :
         QWidget(parent),
-        ui(new Ui::PropertyEditor) {
+        ui(new Ui::PropertyEditor),
+        m_Animated(false) {
 
     ui->setupUi(this);
 
     m_pFilter   = new PropertyFilter(this);
     m_pFilter->setSourceModel(new PropertyModel(this));
 
+    ui->treeView->setContextMenuPolicy(Qt::CustomContextMenu);
     ui->treeView->setModel(m_pFilter);
     ui->treeView->setItemDelegate(new PropertyDelegate(this));
 
@@ -218,6 +212,10 @@ void PropertyEditor::onUpdated() {
         i++;
         it  = m->index(i, 1);
     }
+}
+
+void PropertyEditor::onAnimated(bool flag) {
+    m_Animated  = flag;
 }
 
 void PropertyEditor::registerCustomPropertyCB(UserTypeCB callback) {
@@ -264,7 +262,39 @@ void PropertyEditor::on_lineEdit_textChanged(const QString &arg1) {
         i++;
         it  = m->index(i, 1);
     }
-
     ui->treeView->expandToDepth(-1);
 }
 
+void PropertyEditor::on_treeView_customContextMenuRequested(const QPoint &pos) {
+    if(m_Animated) {
+        QMenu menu;
+        QAction *action     = menu.addAction(tr("Insert Keyframe"), this, SLOT(onInsertKeyframe()));
+        QModelIndex origin  = m_pFilter->mapToSource(ui->treeView->indexAt(pos));
+        if(origin.isValid()) {
+            PropertyModel *model    = static_cast<PropertyModel *>(m_pFilter->sourceModel());
+            QModelIndex index   = model->index(origin.row(), 1, origin.parent());
+            Property *item  = static_cast<Property *>(index.internalPointer());
+            QVariant data   = item->value(Qt::DisplayRole);
+            int32_t type    = data.userType();
+            action->setEnabled((type == QMetaType::Bool || type == QMetaType::Int || type == QMetaType::Float ||
+                                type == QMetaType::type("Vector3") || type == QMetaType::type("QColor")));
+
+            NextObject *property   = dynamic_cast<NextObject *>(item->propertyObject());
+            if(property) {
+                action->setProperty("object", QVariant::fromValue(property));
+                action->setProperty("property", item->objectName());
+            }
+        }
+        menu.exec(ui->treeView->mapToGlobal(pos));
+    }
+}
+
+void PropertyEditor::onInsertKeyframe() {
+    QAction *action     = static_cast<QAction *>(sender());
+    NextObject *next    = action->property("object").value<NextObject *>();
+    if(next) {
+        QStringList list    = action->property("property").toString().split('/');
+        Object *object  = next->findChild(list);
+        next->setChanged(object, list.front());
+    }
+}
