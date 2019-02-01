@@ -14,7 +14,7 @@ Rectangle {
 
     property int rowHeight: 17
 
-    property int selectKey: -1
+    property int selectInd: -1
     property int selectRow: -1
 
     property int minStep: 8
@@ -25,9 +25,9 @@ Rectangle {
     property real timeScale: 0.01
     property int timeStep: minStep
 
-    signal addKey(int row, real position)
-    signal removeKey(int row, int index)
-    signal moveKey(int row, int index, real position)
+    signal addKey   (int row, int col, int position)
+    signal removeKey(int row, int col, int index)
+    signal selectKey(int row, int col, int index)
 
     Theme {
         id: theme
@@ -38,40 +38,83 @@ Rectangle {
         onLayoutChanged: {
             maxPos = 0
             for(var i = 0; i < clipModel.rowCount(); i++) {
-                maxPos = Math.max(clipModel.keyPosition(i, clipModel.keysCount(i) - 1), maxPos)
+                maxPos = clipModel.maxPosition(i)
             }
         }
     }
 
     MouseArea {
         anchors.fill: parent
+
+        acceptedButtons: Qt.LeftButton | Qt.MidButton
+        hoverEnabled: true
+
+        property int oldX: 0
+        property int oldY: 0
+
         onClicked: {
-            selectKey = -1
+            selectInd = -1
             selectRow = -1
             clipModel.position = Math.max(Math.round((mouseX - posX) / timeStep), 0) * timeScale
         }
-        onWheel: {
-            if(wheel.angleDelta.y > 0) {
-                timeStep += 1;
-                if(timeStep > maxStep) {
-                    if(timeScale > 0.01) {
-                        timeStep = minStep;
-                        timeScale /= 5;
-                    }
-                }
-            } else {
-                timeStep -= 1;
-                if(timeStep < minStep) {
-                    timeStep = maxStep;
-                    timeScale *= 5.0;
-                }
+
+        onPressed: {
+            if(mouse.buttons === Qt.MiddleButton) {
+                oldX = mouse.x
+                oldY = mouse.y
             }
         }
 
+        onWheel: {
+            if(wheel.angleDelta.y > 0) {
+                timeStep += 1
+                if(timeStep > maxStep) {
+                    if(timeScale > 0.01) {
+                        timeStep = minStep
+                        timeScale /= 5
+                    }
+                }
+                hbar.position += (mouseX / curve.toScreenSpaceX(maxPos)) * (1 / timeStep)
+
+                curve.valueStep += 1
+                if(curve.valueStep > curve.maxValue) {
+                    curve.valueStep = curve.minValue
+                    curve.valueScale /= 5.0;
+                }
+                vbar.position += (mouseY / curve.toScreenSpaceY(Math.abs(curve.maximum - curve.minimum))) * (1 / curve.valueStep)
+
+            } else {
+                timeStep -= 1
+                if(timeStep < minStep) {
+                    timeStep = maxStep
+                    timeScale *= 5.0
+                }
+                hbar.position -= (mouseX / curve.toScreenSpaceX(maxPos)) * (1 / timeStep)
+
+                curve.valueStep -= 1
+                if(curve.valueStep < curve.minValue) {
+                    curve.valueStep = curve.maxValue
+                    curve.valueScale *= 5.0;
+                }
+                vbar.position -= (mouseY / curve.toScreenSpaceY(Math.abs(curve.maximum - curve.minimum))) * (1 / curve.valueStep)
+
+            }
+            hbar.position = Math.max(hbar.position, 0.0)
+        }
+
         onPositionChanged: {
-            if(selectKey == -1) {
+            if(selectInd == -1 && pressedButtons === Qt.LeftButton) {
                 clipModel.position = Math.max(Math.round((mouseX - posX) / timeStep), 0) * timeScale
             }
+
+            if(mouse.buttons === Qt.MiddleButton) {
+                hbar.position += curve.toLocalSpaceX(oldX - mouse.x) * 0.5
+                hbar.position = Math.max(hbar.position, 0.0)
+                vbar.position += curve.toLocalSpaceY(oldY - mouse.y) / curve.valueScale
+                oldX = mouse.x
+                oldY = mouse.y
+            }
+
         }
     }
 
@@ -82,7 +125,7 @@ Rectangle {
         height: parent.height
 
         Repeater {
-            model: ruler.width / (timeStep * 5)
+            model: Math.ceil(ruler.width / (timeStep * 5))
             Rectangle {
                 anchors.bottom: ruler.bottom
                 height: ruler.height - 12
@@ -117,41 +160,50 @@ Rectangle {
     }
 
     CurveEditor {
-        anchors.fill: parent
-        anchors.topMargin: 19
-        //visible: false
-
-        posX: (width / hbar.size * hbar.position)
-        posY: height * 0.5
-
-        row: 8
-        timeStep: parent.timeStep
-        timeScale: parent.timeScale
-
-        valueStep: parent.timeStep * 2
-        valueScale: 1.0//parent.timeScale
-    }
-
-    KeyframeEditor {
-        //id: keyframeEditor
+        id: curve
+        objectName: "curve"
 
         anchors.fill: parent
         anchors.topMargin: 19
         visible: false
+
+        posX: (width / hbar.size * hbar.position)
+        posY: (toScreenSpaceY(maximum + Math.abs(maximum - minimum) * 0.5)) - (parent.height / vbar.size * vbar.position)
+
+        timeStep: parent.timeStep
+        timeScale: parent.timeScale
+
+        valueStep: minValue
+        valueScale: 1.0
+
+        onRowChanged: {
+            if(visible) {
+                vbar.position = 0.5 - vbar.size * 0.5
+            }
+        }
+
+        onVisibleChanged: {
+            if(visible) {
+                vbar.size = (parent.height - 19) / (curve.toScreenSpaceY(Math.abs(maximum - minimum)))
+                vbar.position = 0.5 - vbar.size * 0.5
+            }
+        }
     }
 
-    ScrollBar {
-        id: hbar
-        hoverEnabled: true
-        active: hovered || pressed
-        orientation: Qt.Horizontal
-        size: {
-            var result = ((maxPos / 1000.0) / timeScale) * parent.timeStep
-            return parent.width / (result + maxStep * 2)
-        }
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
+    KeyframeEditor {
+        id: keys
+        objectName: "keys"
+
+        anchors.fill: parent
+        anchors.topMargin: 19
+
+        posX: (width / hbar.size * hbar.position)
+        //posY: (height / vbar.size * vbar.position)
+
+        timeStep: parent.timeStep
+        timeScale: parent.timeScale
+
+        //visible: false
     }
 
     Rectangle {
@@ -160,5 +212,29 @@ Rectangle {
         width: 2
         height: parent.height
         color: theme.redColor
+    }
+
+    ScrollBar {
+        id: hbar
+        hoverEnabled: true
+        active: hovered || pressed
+        orientation: Qt.Horizontal
+        size: parent.width / (curve.toScreenSpaceX(maxPos) + maxStep * 2)
+
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+    }
+
+    ScrollBar {
+        id: vbar
+        hoverEnabled: true
+        active: hovered || pressed
+        orientation: Qt.Vertical
+        size: (parent.height - 19) / (curve.toScreenSpaceY(Math.abs(curve.maximum - curve.minimum)))
+
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
     }
 }

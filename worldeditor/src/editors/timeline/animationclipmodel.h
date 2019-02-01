@@ -3,12 +3,16 @@
 
 #include <QAbstractItemModel>
 
+#include <animationcurve.h>
+
 class AnimationController;
 
 class AnimationClipModel : public QAbstractItemModel {
     Q_OBJECT
 
     Q_PROPERTY(float position READ position WRITE setPosition NOTIFY positionChanged)
+    Q_PROPERTY(int row READ row WRITE setRow NOTIFY rowChanged)
+    Q_PROPERTY(int col READ col WRITE setCol NOTIFY rowChanged)
 
 public:
     AnimationClipModel          (QObject *parent);
@@ -27,27 +31,35 @@ public:
 
     int                         rowCount                    (const QModelIndex &) const;
 
-    Q_INVOKABLE int             keysCount                   (int index) const;
-
-    Q_INVOKABLE unsigned int    keyPosition                 (int track, int index) const;
-
-    Q_INVOKABLE QVariant        keyValue                    (int track, int index) const;
-
     Q_INVOKABLE QVariant        trackData                   (int track) const;
 
     Q_INVOKABLE void            setTrackData                (int track, const QVariant &data);
 
+    Q_INVOKABLE int             maxPosition                 (int track);
+
     float                       position                    () const;
     void                        setPosition                 (float value);
 
+    int                         row                         () const;
+    void                        setRow                      (int value);
+
+    int                         col                         () const;
+    void                        setCol                      (int value);
+
+    void                        selectItem                  (const QModelIndex &index);
+
+    AnimationCurve::KeyFrame   *key                         (int row, int col, int index);
+
+    void                        updateController            ();
+
 public slots:
-    void                        onAddKey                    (int row, qreal value);
-    void                        onRemoveKey                 (int row, int index);
-    void                        onMoveKey                   (int row, int index, qreal value);
+    void                        onAddKey                    (int row, int col, int pos);
+    void                        onRemoveKey                 (int row, int col, int index);
 
 signals:
     void                        changed                     ();
 
+    void                        rowChanged                  ();
     void                        positionChanged             ();
 
 protected:
@@ -58,6 +70,9 @@ protected:
     QModelIndex                 m_HoverIndex;
 
     float                       m_Position;
+
+    int                         m_Row;
+    int                         m_Col;
 
 };
 

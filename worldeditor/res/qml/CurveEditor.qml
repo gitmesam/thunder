@@ -7,14 +7,20 @@ Rectangle {
     color: "#f0808080"
     clip: true
 
-    property int selectKey: -1
-    property int selectComponent: -1
+    focus: true
+
+    property int selectInd: -1
+    property int selectCol: -1
 
     property int row: 0
+    property int col: clipModel.col
     property variant curve: clipModel.trackData(row)
 
     property int timeStep: minStep
     property real timeScale: 0.01
+
+    property int minValue: 20
+    property int maxValue: 100
 
     property int valueStep: minStep
     property real valueScale: 0.01
@@ -22,46 +28,90 @@ Rectangle {
     property int posX: 0
     property int posY: 0
 
-    property bool braked: false
+    property real minimum: 0
+    property real maximum: 0
 
     onPosXChanged: canvas.requestPaint()
     onPosYChanged: canvas.requestPaint()
 
+    onValueStepChanged: canvas.requestPaint()
+
+    function toScreenSpaceX(pos) {
+        return ((pos / 1000.0) / timeScale) * timeStep + minStep
+    }
+
+    function toScreenSpaceY(pos) {
+        return (pos / valueScale) * valueStep
+    }
+
+    function toLocalSpaceX(pos) {
+        return (pos / timeStep) * timeScale
+    }
+
+    function toLocalSpaceY(pos) {
+        return (pos / valueStep) * valueScale
+    }
+
     Connections {
         target: clipModel
         onLayoutChanged: {
-            points.model = 0
             curve = undefined
             var count = clipModel.rowCount()
             if(count >= row) {
                 curve = clipModel.trackData(row)
-
-                var minValue = Number.MAX_VALUE
-                var maxValue = Number.MIN_VALUE
-                for(var i = 0; i < canvas.componentsNumber; i++) {
-                    for(var k = 0; k < curve.length - canvas.offset; k++) {
-                        var key = curve[k + canvas.offset]
-                        var py = -(key[i + canvas.offset])
-
-                        minValue = Math.min(py, minValue)
-                        maxValue = Math.max(py, maxValue)
-                    }
-                }
-                //canvas.valueScale = (Math.abs(minValue) + Math.abs(maxValue)) / curveEditor.height
             }
             canvas.requestPaint()
+        }
+
+        onRowChanged: {
+            var r = clipModel.row
+            curve = clipModel.trackData(r)
+
+            minimum = Number.MAX_VALUE
+            maximum = Number.MIN_VALUE
+            for(var i = 0; i < canvas.componentsNumber; i++) {
+                var keysNumber = curve[i].length - 1
+                for(var k = 0; k < keysNumber; k++) {
+                    var key = curve[i][k + 1]
+                    var py = -(key[canvas.offset])
+
+                    minimum = Math.min(py, minimum)
+                    maximum = Math.max(py, maximum)
+                }
+            }
+            var size = Math.abs(maximum - minimum)
+            var value = 0.01
+            while(true) {
+                var v = value * 10.0
+                if((size / v) <= 0.5) {
+                    break;
+                }
+                value = v
+            }
+            valueScale = value
+            valueStep = maxValue
+
+            canvas.requestPaint()
+
+            row = r
         }
     }
 
     onCurveChanged: {
         if(curve !== undefined) {
-            canvas.componentsNumber = curve[0]
-            canvas.keysNumber = (curve.length - 1)
+            canvas.componentsNumber = curve.length
             canvas.requestPaint()
-
-            points.model = canvas.keysNumber * canvas.componentsNumber
         }
     }
+
+    Keys.onPressed: {
+        if(event.key === Qt.Key_Delete) {
+            removeKey(row, selectCol, selectInd)
+            selectInd = -1
+            selectCol = -1
+        }
+    }
+
 
     Canvas {
         id: canvas
@@ -70,90 +120,97 @@ Rectangle {
 
         antialiasing: false
 
-        property int timeStep: rect.timeStep
-        property int keysNumber: 0
         property int componentsNumber: 0
 
-        property var colors: [Qt.rgba(1,0,0), Qt.rgba(0,1,0), Qt.rgba(0,0,1), Qt.rgba(1,1,0), Qt.rgba(1,0,1), Qt.rgba(0,1,1)]
+        property int offset: 2
+        property int leftOffset: offset + 1
+        property int rightOffset: leftOffset + 1
 
-        property int offset: 1
-        property int leftOffset: componentsNumber + offset
-        property int rightOffset: componentsNumber * 2 + offset
-
-        function toScreenSpaceX(pos) {
-            return ((pos / 1000.0) / timeScale) * timeStep + minStep
-        }
-
-        function toScreenSpaceY(pos) {
-            return (pos / valueScale) * valueStep
-        }
-
-        onTimeStepChanged:requestPaint()
+        property int dist: 50
 
         onPaint: {
             context.clearRect(0, 0, canvas.width, canvas.height);
             if(curveEditor.curve !== undefined) {
-                context.translate(-posX, posY - (canvas.height / vbar.size * vbar.position))
+                context.translate(-posX, posY)
 
                 for(var i = 0; i < componentsNumber; i++) {
-                    context.strokeStyle = colors[i]
+                    if(col > -1 && i != col) {
+                        continue
+                    }
+
+                    context.strokeStyle = theme.colors[i]
                     context.beginPath()
 
-                    var key = curveEditor.curve[offset]
-                    context.moveTo(toScreenSpaceX(key[0]), -toScreenSpaceY(key[i + offset]))
+                    var keysNumber = curve[i].length - 1
 
-                    for(var k = 0; k < curveEditor.curve.length - offset; k++) {
-                        var key1 = curveEditor.curve[k + offset]
+                    var key = curve[i][1]
+                    context.moveTo(toScreenSpaceX(key[0]), -toScreenSpaceY(key[offset]))
+
+                    for(var k = 0; k < keysNumber; k++) {
+                        var key1 = curve[i][k + 1]
                         var px1 = toScreenSpaceX(key1[0])
-                        var py1 = -toScreenSpaceY(key1[i + offset])
-
-                        var d = 0
+                        var py1 = -toScreenSpaceY(key1[offset])
 
                         var tx0 = px1
                         var ty0 = py1
 
+                        var d = 0
                         if((k - 1) >= 0) {
-                            var key0 = curveEditor.curve[(k - 1) + offset]
+                            var key0 = curve[i][k]
                             var px0 = toScreenSpaceX(key0[0])
-                            var py0 = -toScreenSpaceY(key0[i + offset])
+                            var py0 = -toScreenSpaceY(key0[offset])
 
                             d = (px1 - px0) * 0.5
 
                             tx0 = px0 + d
-                            ty0 = -toScreenSpaceY(key0[i + rightOffset])
+                            ty0 = -toScreenSpaceY(key0[rightOffset])
                         }
                         var tx1 = px1 - d
-                        var ty1 = -toScreenSpaceY(key1[i + leftOffset])
+                        var ty1 = -toScreenSpaceY(key1[leftOffset])
 
                         context.bezierCurveTo(tx0,ty0, tx1,ty1, px1,py1)
                     }
                     context.stroke();
 
-                    if(selectKey >= 0 && (selectKey % componentsNumber) == i) {
+                    if(selectInd >= 0 && selectCol == i) {
                         context.strokeStyle = Qt.rgba(0.3, 0.3, 0.3)
 
-                        key = curveEditor.curve[Math.floor(selectKey / canvas.componentsNumber) + offset]
-                        var px = toScreenSpaceX(key[0])
-                        var py = -toScreenSpaceY(key[i + offset])
+                        key1 = curve[selectCol][selectInd + 1]
+                        px1 = toScreenSpaceX(key1[0])
+                        py1 = -toScreenSpaceY(key1[offset])
 
-                        var value = key[i + leftOffset]
-                        tx1 = (1.0 / Math.sqrt(points.dist * points.dist + value * value)) * points.dist * -points.dist + px
-                        value -= key[i + 1]
-                        ty1 =-((1.0 / Math.sqrt(points.dist * points.dist + value * value)) * value) * points.dist + py
+                        d = 0
+                        if((selectInd + 1) < (curve[selectCol].length - 1)) {
+                            key0 = curve[selectCol][selectInd + 2]
+                            d = (px1 - toScreenSpaceX(key0[0])) * 0.5
+                        }
+                        tx1 = -d
+                        ty1 = -toScreenSpaceY(key1[rightOffset]) - py1
+
+                        var l = (1.0 / Math.sqrt(tx1 * tx1 + ty1 * ty1))
+                        tx1 = l * tx1 * dist
+                        ty1 = l * ty1 * dist
 
                         context.beginPath()
-                        context.moveTo(px, py)
-                        context.lineTo(tx1, ty1)
+                        context.moveTo(px1, py1)
+                        context.lineTo(tx1 + px1, ty1 + py1)
                         context.stroke();
 
-                        value = key[i + rightOffset]
-                        tx1 = (1.0 / Math.sqrt(points.dist * points.dist + value * value)) * points.dist * points.dist + px
-                        value -= key[i + 1]
-                        ty1 =-((1.0 / Math.sqrt(points.dist * points.dist + value * value)) * value) * points.dist + py
+                        d = 0
+                        if((selectInd - 1) >= 0) {
+                            key0 = curve[selectCol][selectInd]
+                            d = (px1 - toScreenSpaceX(key0[0])) * 0.5
+                        }
+                        tx1 = -d
+                        ty1 = -toScreenSpaceY(key1[leftOffset]) - py1
+
+                        l = (1.0 / Math.sqrt(tx1 * tx1 + ty1 * ty1))
+                        tx1 = l * tx1 * dist
+                        ty1 = l * ty1 * dist
 
                         context.beginPath()
-                        context.moveTo(px, py)
-                        context.lineTo(tx1, ty1)
+                        context.moveTo(px1, py1)
+                        context.lineTo(tx1 + px1, ty1 + py1)
                         context.stroke();
                     }
                 }
@@ -163,22 +220,22 @@ Rectangle {
     }
 
     Repeater {
-        model: curveEditor.height / valueStep
+        model: Math.ceil(curveEditor.height / valueStep)
         Rectangle {
             anchors.left: curveEditor.left
             height: 1
             width: 50
             color: theme.hoverColor
-            y: index * valueStep + ((posY - (canvas.height / vbar.size * vbar.position)) % valueStep)
+            y: index * valueStep + (posY % valueStep)
 
-            property int shift: (posY - (canvas.height / vbar.size * vbar.position)) / valueStep
+            property int shift: posY / valueStep
             Label {
                 anchors.bottom: parent.top
                 anchors.right: parent.right
                 color: theme.hoverColor
                 text: {
                     var value = -(index - parent.shift) * valueScale
-                    return value.toLocaleString(Qt.locale("en_EN"), 'f', 4) * 1
+                    return value.toLocaleString(Qt.locale("en_EN"), 'f', 2)
                 }
                 font.pointSize: 8
                 renderType: Text.NativeRendering
@@ -187,188 +244,215 @@ Rectangle {
     }
 
     Repeater {
-        id: points
+        model: (curveEditor.col > -1) ? 1 : canvas.componentsNumber
+        Repeater {
+            id: points
+            model: curve[col].length - 1
 
-        property int pointSize: 6
-        property int pointCenter: pointSize * 0.5
-        property int dist: 50
+            property int col: (curveEditor.col > -1) ? curveEditor.col : index
+            property int component: curve[col][0]
 
-        Item {
-            id: item
-            property variant key: curveEditor.curve[Math.floor(index / canvas.componentsNumber) + 1]
-            property int component: index % canvas.componentsNumber
+            property int pointSize: 6
+            property int pointCenter: pointSize * 0.5
 
-            x: canvas.toScreenSpaceX(key[0]) - posX - points.pointCenter
-            y: -canvas.toScreenSpaceY(key[component + 1]) + (posY - (canvas.height / vbar.size * vbar.position)) - points.pointCenter
+            Item {
+                id: item
+                property variant key: curve[points.col][index + 1]
+                property bool breaked: false
 
-            function commitKey() {
-                var data = curve
-                data[Math.floor(index / canvas.componentsNumber) + 1] = item.key
-                curve = data
-            }
+                x: toScreenSpaceX(key[0]) - posX - points.pointCenter
+                y: -toScreenSpaceY(key[canvas.offset]) + posY - points.pointCenter
 
-            Rectangle {
-                color: (selectKey == index) ? theme.hoverBlueColor : "#a0606060"
-                border.color: theme.textColor
+                function commitKey() {
+                    var data = curve
+                    data[points.col][index + 1] = item.key
+                    curve = data
+                }
 
-                height: points.pointSize
-                width: points.pointSize
+                Rectangle {
+                    color: (selectInd == index && selectCol == points.col) ? theme.hoverBlueColor : "#a0606060"
+                    border.color: theme.textColor
 
-                rotation: 45
+                    height: points.pointSize
+                    width: points.pointSize
 
-                MouseArea {
-                    anchors.fill: parent
+                    rotation: 45
 
-                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    MouseArea {
+                        anchors.fill: parent
 
-                    drag.target: item
-                    drag.axis: Drag.XAxis | Drag.YAxis
-                    drag.minimumX: 0
-                    drag.maximumX: rect.width
-                    drag.minimumY: 0
-                    drag.maximumY: rect.height
-                    drag.threshold: 0
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
 
-                    drag.onActiveChanged: {
-                        if(!drag.active) {
-                            clipModel.setTrackData(curveEditor.row, curveEditor.curve)
+                        drag.target: item
+                        drag.axis: Drag.XAxis | Drag.YAxis
+                        drag.minimumX: 0
+                        drag.maximumX: rect.width
+                        drag.minimumY: 0
+                        drag.maximumY: rect.height
+                        drag.threshold: 0
+
+                        drag.onActiveChanged: {
+                            if(!drag.active) {
+                                clipModel.setTrackData(curveEditor.row, curveEditor.curve)
+                                selectKey(row, selectCol, selectInd)
+                            }
                         }
-                    }
 
-                    onPressed: {
-                        selectKey = index
-                        selectComponent = item.component
+                        onPressed: {
+                            selectInd = index
+                            selectCol = points.col
 
-                        canvas.requestPaint()
+                            selectKey(row, selectCol, selectInd)
 
-                        xLabel.visible = true
-                        xLabel.x = item.x
+                            canvas.requestPaint()
 
-                        yLabel.visible = true
-                        yLabel.y = item.y
-                    }
-
-                    onReleased: {
-                        xLabel.visible = false
-                        yLabel.visible = false
-                    }
-
-                    onClicked: {
-                        if(mouse.button === Qt.RightButton) {
-                            menu.open()
-                        }
-                    }
-
-                    onPositionChanged: {
-                        if(drag.active) {
+                            xLabel.visible = true
                             xLabel.x = item.x
+
+                            yLabel.visible = true
                             yLabel.y = item.y
-
-                            var x = Math.round(item.x / timeStep) * timeStep - points.pointSize
-
-                            item.key[0] = Math.max(Math.round((x + posX) / timeStep), 0) * timeScale * 1000
-                            var value = (-((item.y - posY + 3) / valueStep) * valueScale) - item.key[item.component + 1]
-                            item.key[item.component + 1] += value
-                            item.key[item.component + canvas.leftOffset]  += value
-                            item.key[item.component + canvas.rightOffset] += value
-
-                            item.commitKey()
                         }
-                    }
-                }
 
-
-            }
-
-            Rectangle {
-                id: leftTangent
-                visible: (selectKey == index) && (Math.floor(index / canvas.componentsNumber) > 0)
-                color: "#a0606060"
-                border.color: theme.textColor
-                height: 6
-                width: 6
-
-                x: {
-                    var value = item.key[item.component + canvas.leftOffset]
-                    value = ((1.0 / Math.sqrt(points.dist * points.dist + value * value)) * points.dist) * -points.dist
-                    return value
-                }
-                y: {
-                    var value = item.key[item.component + canvas.leftOffset] - item.key[item.component + 1]
-                    value = -((1.0 / Math.sqrt(points.dist * points.dist + value * value)) * value) * points.dist
-                    return value
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-
-                    drag.target: parent
-                    drag.axis: Drag.XAxis | Drag.YAxis
-                    drag.minimumX:-points.dist
-                    drag.maximumX: 0
-                    drag.minimumY:-points.dist
-                    drag.maximumY: points.dist
-                    drag.threshold: 0
-
-                    drag.onActiveChanged: {
-                        if(!drag.active) {
-                            clipModel.setTrackData(curveEditor.row, curveEditor.curve)
+                        onReleased: {
+                            xLabel.visible = false
+                            yLabel.visible = false
                         }
-                    }
 
-                    onPositionChanged: {
-                        if(drag.active) {
-                            item.key[item.component + canvas.leftOffset] = (parent.y / parent.x) * valueStep + item.key[item.component + 1]
-                            if(!braked) {
-                                item.key[item.component + canvas.rightOffset] = -(parent.y / parent.x) * valueStep + item.key[item.component + 1]
+                        onClicked: {
+                            if(mouse.button === Qt.RightButton) {
+                                menu.open()
                             }
-
-                            item.commitKey()
                         }
-                    }
-                }
-            }
 
-            Rectangle {
-                id: rightTangent
-                visible: (selectKey == index) && (Math.floor(index / canvas.componentsNumber) < canvas.keysNumber - 1)
-                color: "#a0606060"
-                border.color: theme.textColor
-                height: 6
-                width: 6
-                x: {
-                    var value = item.key[item.component + canvas.rightOffset]
-                    return (1.0 / Math.sqrt(points.dist * points.dist + value * value)) * points.dist * points.dist
-                }
-                y: {
-                    var value = item.key[item.component + canvas.rightOffset] - item.key[item.component + 1]
-                    return -((1.0 / Math.sqrt(points.dist * points.dist + value * value)) * value) * points.dist
-                }
+                        onPositionChanged: {
+                            if(drag.active) {
+                                xLabel.x = item.x
+                                yLabel.y = item.y
 
-                MouseArea {
-                    anchors.fill: parent
+                                var x = Math.round(item.x / timeStep) * timeStep - points.pointSize
 
-                    drag.target: parent
-                    drag.axis: Drag.XAxis | Drag.YAxis
-                    drag.minimumX: 0
-                    drag.maximumX: points.dist
-                    drag.minimumY:-points.dist
-                    drag.maximumY: points.dist
-                    drag.threshold: 0
+                                item.key[0] = Math.max(Math.round((x + posX) / timeStep), 0) * timeScale * 1000
+                                var value = (-((item.y - posY + 3) / valueStep) * valueScale) - item.key[canvas.offset]
+                                item.key[canvas.offset] += value
+                                item.key[canvas.leftOffset]  += value
+                                item.key[canvas.rightOffset] += value
 
-                    drag.onActiveChanged: {
-                        if(!drag.active) {
-                            clipModel.setTrackData(curveEditor.row, curveEditor.curve)
-                        }
-                    }
-
-                    onPositionChanged: {
-                        if(drag.active) {
-                            item.key[item.component + canvas.rightOffset] = -(parent.y / parent.x) * valueStep + item.key[item.component + 1]
-                            if(!braked) {
-                                item.key[item.component + canvas.leftOffset] = (parent.y / parent.x) * valueStep + item.key[item.component + 1]
+                                item.commitKey()
                             }
-                            item.commitKey()
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: leftTangent
+                    visible: (selectInd == index) && (selectCol == points.col) && (index > 0)
+                    color: "#a0606060"
+                    border.color: theme.textColor
+                    height: 6
+                    width: 6
+
+                    property real d: {
+                        var result = 0
+                        if(index > 0) {
+                            var key0 = curve[points.col][index]
+                            result = (toScreenSpaceX(item.key[0]) - toScreenSpaceX(key0[0])) * 0.5
+                        }
+
+                        var py1 = -toScreenSpaceY(item.key[canvas.offset])
+                        var tx1 = -result
+                        var ty1 = -toScreenSpaceY(item.key[canvas.leftOffset]) - py1
+
+                        var l = (1.0 / Math.sqrt(tx1 * tx1 + ty1 * ty1))
+                        x = l * tx1 * canvas.dist
+                        y = l * ty1 * canvas.dist
+
+                        return result
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        drag.target: parent
+                        drag.axis: Drag.XAxis | Drag.YAxis
+                        drag.minimumX:-canvas.dist
+                        drag.maximumX: 0
+                        drag.minimumY:-canvas.dist
+                        drag.maximumY: canvas.dist
+                        drag.threshold: 0
+
+                        drag.onActiveChanged: {
+                            if(!drag.active) {
+                                clipModel.setTrackData(curveEditor.row, curveEditor.curve)
+                                selectKey(row, selectCol, selectInd)
+                            }
+                        }
+
+                        onPositionChanged: {
+                            if(drag.active) {
+                                var value = toLocalSpaceY((parent.y / parent.x) * parent.d)
+                                item.key[canvas.leftOffset] = value + item.key[canvas.offset]
+                                if(!breaked) {
+                                    item.key[canvas.rightOffset] = -value + item.key[canvas.offset]
+                                }
+                                item.commitKey()
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: rightTangent
+                    visible: (selectInd == index) && (selectCol == points.col) && ((index + 1) < (curve[points.col].length - 1))
+                    color: "#a0606060"
+                    border.color: theme.textColor
+                    height: 6
+                    width: 6
+
+                    property real d: {
+                        var result = 0
+                        if((index + 1) < (curve[points.col].length - 1)) {
+                            var key0 = curve[points.col][index + 2]
+                            result = (toScreenSpaceX(item.key[0]) - toScreenSpaceX(key0[0])) * 0.5
+                        }
+
+                        var py1 = -toScreenSpaceY(item.key[canvas.offset])
+                        var tx1 = -result
+                        var ty1 = -toScreenSpaceY(item.key[canvas.rightOffset]) - py1
+
+                        var l = (1.0 / Math.sqrt(tx1 * tx1 + ty1 * ty1))
+                        x = l * tx1 * canvas.dist
+                        y = l * ty1 * canvas.dist
+
+                        return result
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        drag.target: parent
+                        drag.axis: Drag.XAxis | Drag.YAxis
+                        drag.minimumX: 0
+                        drag.maximumX: canvas.dist
+                        drag.minimumY:-canvas.dist
+                        drag.maximumY: canvas.dist
+                        drag.threshold: 0
+
+                        drag.onActiveChanged: {
+                            if(!drag.active) {
+                                clipModel.setTrackData(curveEditor.row, curveEditor.curve)
+                                selectKey(row, selectCol, selectInd)
+                            }
+                        }
+
+                        onPositionChanged: {
+                            if(drag.active) {
+                                var value = toLocalSpaceY((parent.y / parent.x) * parent.d)
+                                item.key[canvas.rightOffset] = value + item.key[canvas.offset]
+                                if(!breaked) {
+                                    item.key[canvas.leftOffset] = -value + item.key[canvas.offset]
+                                }
+                                item.commitKey()
+                            }
                         }
                     }
                 }
@@ -390,8 +474,8 @@ Rectangle {
             id: xlabel
             color: theme.textColor
             text: {
-                if(selectKey >= 0 && curveEditor.curve) {
-                    var key = curveEditor.curve[Math.floor(selectKey / canvas.componentsNumber) + 1]
+                if(selectInd >= 0 && selectCol >= 0 && curve) {
+                    var key = curve[selectCol][selectInd + 1]
                     var value = key[0] / 1000.0
                     return value.toLocaleString(Qt.locale("en_EN"), 'f', 2).replace('.', ':')
                 }
@@ -415,52 +499,14 @@ Rectangle {
             id: ylabel
             color: theme.textColor
             text: {
-                if(selectKey >= 0 && curveEditor.curve) {
-                    var key = curveEditor.curve[Math.floor(selectKey / canvas.componentsNumber) + 1]
-                    var value = key[selectComponent + 1]
+                if(selectInd >= 0 && selectCol >= 0 && curve) {
+                    var key = curve[selectCol][selectInd + 1]
+                    var value = key[canvas.offset]
                     return value.toLocaleString(Qt.locale("en_EN"), 'f', 2) * 1
                 }
                 return ""
             }
             anchors.centerIn: parent
-        }
-    }
-
-    ScrollBar {
-        id: vbar
-        hoverEnabled: true
-        active: hovered || pressed
-        orientation: Qt.Vertical
-        size: parent.height
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-
-        onPositionChanged: canvas.requestPaint()
-    }
-
-    ContextMenu {
-        id: menu
-        y: parent.height
-
-        font.pointSize: 8
-        margins: 18
-
-        Action {
-            text: "Delete Key"
-        }
-        Action {
-            text: "Edit Key"
-            onTriggered: functionCreate(Name, text)
-        }
-        Action {
-            text: "Flat"
-            onTriggered: functionCreate(Name, text)
-        }
-        Action {
-            text: "Brake the force"
-            checkable: true
-            onTriggered: functionCreate(Name, text)
         }
     }
 }

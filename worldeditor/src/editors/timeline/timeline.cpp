@@ -15,7 +15,11 @@
 
 #include <QSettings>
 #include <QQmlContext>
+#include <QQmlProperty>
+#include <QQmlEngine>
 #include <QQuickItem>
+#include <QJsonDocument>
+#include <QJsonArray>
 
 bool compare(const AnimationClip::Track &first, const AnimationClip::Track &second) {
     if(first.path == second.path) {
@@ -30,7 +34,8 @@ Timeline::Timeline(QWidget *parent) :
         m_pController(nullptr),
         m_TimerId(0),
         m_ContentMenu(this),
-        m_Modified(false) {
+        m_Modified(false),
+        m_pKey(nullptr) {
     ui->setupUi(this);
     ui->pause->setVisible(false);
 
@@ -47,15 +52,18 @@ Timeline::Timeline(QWidget *parent) :
 
     ui->record->setProperty("checkred", true);
     ui->play->setProperty("checkgreen", true);
+    ui->curve->setProperty("checkgreen", true);
 
     QQuickItem *item = ui->quickTimeline->rootObject();
-    connect(item, SIGNAL(addKey(int,qreal)), m_pModel, SLOT(onAddKey(int,qreal)));
-    connect(item, SIGNAL(removeKey(int,int)), m_pModel, SLOT(onRemoveKey(int,int)));
-    connect(item, SIGNAL(moveKey(int,int,qreal)), m_pModel, SLOT(onMoveKey(int,int,qreal)));
+    connect(item, SIGNAL(addKey(int,int,int)), m_pModel, SLOT(onAddKey(int,int,int)));
+    connect(item, SIGNAL(removeKey(int,int,int)), m_pModel, SLOT(onRemoveKey(int,int,int)));
+    connect(item, SIGNAL(selectKey(int,int,int)), this, SLOT(onSelectKey(int,int,int)));
 
-    connect(m_pModel, SIGNAL(changed()), this, SLOT(onModified()));
+    connect(m_pModel, &AnimationClipModel::changed, this, &Timeline::onModified);
+    connect(m_pModel, &AnimationClipModel::positionChanged, this, &Timeline::moved);
 
-    connect(m_pModel, SIGNAL(positionChanged()), this, SIGNAL(moved()));
+    connect(ui->valueEdit, &QLineEdit::editingFinished, this, &Timeline::onKeyChanged);
+    connect(ui->timeEdit, &QLineEdit::editingFinished, this, &Timeline::onKeyChanged);
 
     m_ContentMenu.addAction(tr("Remove Properties"), this, SLOT(onRemoveProperty()));
 }
@@ -88,28 +96,34 @@ void Timeline::saveClip() {
         string ref  = Engine::reference(clip);
         QFile file(ProjectManager::instance()->contentPath() + "/" + AssetManager::instance()->guidToPath(ref).c_str());
         if(file.open(QIODevice::WriteOnly)) {
-            VariantList tracks;
+            QVariantList tracks;
             for(auto t : clip->m_Tracks) {
-                VariantList track;
-                track.push_back(t.path);
-                track.push_back(t.property);
+                QVariantList track;
+                track.push_back(t.path.c_str());
+                track.push_back(t.property.c_str());
 
-                VariantList keys;
-                for(auto c : t.curve) {
-                    VariantList key;
-                    key.push_back(int32_t(c.mPosition));
-                    key.push_back(c.mType);
-                    key.push_back(c.mValue);
-                    key.push_back(c.mLeftTangent);
-                    key.push_back(c.mRightTangent);
+                QVariantList curves;
+                for(auto c : t.curves) {
+                    QVariantList keys;
+                    keys.push_back(c.first);
+                    for(auto k : c.second.m_Keys) {
+                        QVariantList key;
+                        key.push_back(k.m_Position);
+                        key.push_back(k.m_Type);
+                        key.push_back(k.m_Value);
+                        key.push_back(k.m_LeftTangent);
+                        key.push_back(k.m_RightTangent);
 
-                    keys.push_back(key);
+                        keys.push_back(key);
+                    }
+                    curves.push_back(keys);
                 }
-                track.push_back(keys);
+                track.push_back(curves);
                 tracks.push_back(track);
             }
 
-            file.write(Json::save(tracks, 0).c_str());
+            QJsonDocument doc(QJsonArray::fromVariantList(tracks));
+            file.write(doc.toJson());
             file.close();
 
             m_Modified  = false;
@@ -166,6 +180,8 @@ void Timeline::onObjectSelected(Object::ObjectList objects) {
 
     ui->treeView->setCurrentIndex(m_pModel->index(0, 0));
 
+    onSelectKey(-1, -1, -1);
+
     emit animated(enable);
 
     on_begin_clicked();
@@ -178,9 +194,16 @@ void Timeline::onChanged(Object::ObjectList objects, const QString &property) {
 }
 
 void Timeline::onUpdated(Object *object, const QString &property) {
+    m_pModel->setController(m_pController);
+
     if(object && !property.isEmpty() && ui->record->isChecked()) {
         AnimationController *controller = findController(object);
         if(controller) {
+            AnimationClip *clip = controller->clip();
+            if(clip == nullptr) {
+                return;
+            }
+
             QString path    = pathTo(static_cast<Object *>(&controller->actor()), object);
 
             const MetaObject *meta  = object->metaObject();
@@ -188,46 +211,77 @@ void Timeline::onUpdated(Object *object, const QString &property) {
             if(index >= 0) {
                 MetaProperty p  = meta->property(index);
                 Variant value   = p.read(object);
-                KeyFrame key(controller->position(), value);
-                /// \todo build support points
 
-                bool create = true;
-                AnimationClip *clip = controller->clip();
-                if(clip == nullptr) {
-                    return;
+                vector<float> data;
+                switch(value.type()) {
+                    case MetaType::VECTOR2: {
+                        Vector2 v = value.toVector2();
+                        data = {v.x, v.y};
+                    } break;
+                    case MetaType::VECTOR3: {
+                        Vector3 v = value.toVector3();
+                        data = {v.x, v.y, v.z};
+                    } break;
+                    case MetaType::VECTOR4: {
+                        Vector4 v = value.toVector4();
+                        data = {v.x, v.y, v.z, v.w};
+                    } break;
+                    default: {
+                        data = {value.toFloat()};
+                    } break;
                 }
-                for(auto &it : clip->m_Tracks) {
-                    if(it.path == path.toStdString() && it.property == property.toStdString()) {
-                        bool update = false;
-                        for(auto &k : it.curve) {
-                            if(k.mPosition == key.mPosition) {
-                                k.mValue = key.mValue;
-                                k.mLeftTangent = key.mLeftTangent;
-                                k.mRightTangent = key.mRightTangent;
-                                update  = true;
+
+                for(uint32_t i = 0; i < data.size(); i++) {
+                    bool create = true;
+                    int32_t component = i;
+
+                    AnimationCurve::KeyFrame key;
+                    key.m_Position = controller->position();
+                    key.m_Value = data[i];
+                    key.m_LeftTangent  = key.m_Value;
+                    key.m_RightTangent  = key.m_Value;
+
+                    for(auto &it : clip->m_Tracks) {
+                        if(it.path == path.toStdString() && it.property == property.toStdString()) {
+                            bool update = false;
+
+                            auto &curve = it.curves[component];
+                            for(auto &k : curve.m_Keys) {
+
+                                if(k.m_Position == key.m_Position) {
+                                    k.m_Value = key.m_Value;
+                                    k.m_LeftTangent = key.m_LeftTangent;
+                                    k.m_RightTangent = key.m_RightTangent;
+                                    update  = true;
+                                }
                             }
+                            if(!update) {
+                                curve.m_Keys.push_back(key);
+                                std::sort(curve.m_Keys.begin(), curve.m_Keys.end(), AnimationClip::compare);
+                            }
+                            create  = false;
+                            break;
                         }
-                        if(!update) {
-                            it.curve.push_back(key);
-                            it.curve.sort(AnimationClip::compare);
-                        }
-                        create  = false;
-                        break;
+                    }
+                    if(create) {
+                        AnimationClip::Track track;
+                        track.path = path.toStdString();
+                        track.property = property.toStdString();
+
+                        AnimationCurve curve;
+                        curve.m_Keys.push_back(key);
+
+                        track.curves[component] = curve;
+
+                        clip->m_Tracks.push_back(track);
+                        clip->m_Tracks.sort(compare);
+
+                        controller->setClip(clip);
                     }
                 }
 
-                if(create) {
-                    AnimationClip::Track track;
-                    track.curve.push_back(key);
-                    track.path      = path.toStdString();
-                    track.property  = property.toStdString();
-
-                    clip->m_Tracks.push_back(track);
-                    clip->m_Tracks.sort(compare);
-
-                    controller->setClip(clip);
-                }
                 m_pModel->setController(m_pController);
+                m_pModel->updateController();
                 onModified();
             }
         }
@@ -239,8 +293,8 @@ void Timeline::onModified() {
 }
 
 void Timeline::onRemoveProperty() {
-    QModelIndexList list    = ui->treeView->selectionModel()->selectedIndexes();
-    AnimationClip *clip     = m_pController->clip();
+    QModelIndexList list = ui->treeView->selectionModel()->selectedIndexes();
+    AnimationClip *clip = m_pController->clip();
     foreach(const QModelIndex &index, list) {
         auto it = clip->m_Tracks.begin();
         advance(it, index.row());
@@ -251,6 +305,28 @@ void Timeline::onRemoveProperty() {
     m_pController->setClip(clip);
 
     onModified();
+}
+
+void Timeline::onSelectKey(int row, int col, int index) {
+    m_Row = row;
+    m_Col = col;
+    m_Ind = index;
+
+    m_pKey = m_pModel->key(row, col, index);
+    if(m_pKey) {
+        ui->timeEdit->setText(QString::number(m_pKey->m_Position));
+        ui->valueEdit->setText(QString::number(m_pKey->m_Value));
+    }
+    ui->deleteKey->setEnabled((m_pKey != nullptr));
+}
+
+void Timeline::onKeyChanged() {
+    if(m_pKey) {
+        m_pKey->m_Position = ui->timeEdit->text().toInt();
+        m_pKey->m_Value = ui->valueEdit->text().toFloat();
+
+        m_pModel->updateController();
+    }
 }
 
 void Timeline::timerEvent(QTimerEvent *) {
@@ -269,7 +345,7 @@ void Timeline::on_play_clicked() {
         killTimer(m_TimerId);
         m_TimerId   = 0;
     } else {
-        m_TimerId   = startTimer(2);
+        m_TimerId   = startTimer(16);
     }
 }
 
@@ -290,27 +366,30 @@ void Timeline::on_next_clicked() {
 }
 
 uint32_t Timeline::findNear(bool backward) {
-    uint32_t current    = 0;
+    uint32_t current = 0;
     if(m_pController) {
-        current    = m_pController->position();
+        current = m_pController->position();
         AnimationClip *clip = m_pController->clip();
         if(clip) {
             for(auto it : clip->m_Tracks) {
-                if(backward) {
-                    auto key    = it.curve.rbegin();
-                    while(key != it.curve.rend()) {
-                        if(key->mPosition < current) {
-                            return key->mPosition;
+                for(auto c : it.curves) {
+                    if(backward) {
+                        auto key = c.second.m_Keys.rbegin();
+                        while(key != c.second.m_Keys.rend()) {
+                            if(key->m_Position < current) {
+                                return key->m_Position;
+                            }
+                            key++;
                         }
-                        key++;
-                    }
-                } else {
-                    for(auto key : it.curve) {
-                        if(key.mPosition > current) {
-                            return key.mPosition;
+                    } else {
+                        for(auto key : c.second.m_Keys) {
+                            if(key.m_Position > current) {
+                                return key.m_Position;
+                            }
                         }
                     }
                 }
+
 
             }
         }
@@ -335,4 +414,41 @@ void Timeline::on_treeView_customContextMenuRequested(const QPoint &pos) {
     if(!ui->treeView->selectionModel()->selectedIndexes().empty()) {
         m_ContentMenu.exec(ui->treeView->mapToGlobal(pos));
     }
+}
+
+void Timeline::on_treeView_clicked(const QModelIndex &index) {
+    m_pModel->selectItem(index);
+}
+
+void Timeline::on_curve_toggled(bool checked) {
+    QObject *curve = ui->quickTimeline->rootObject()->findChild<QObject *>("curve");
+    if(curve) {
+        QQmlProperty::write(curve, "visible", checked);
+    }
+    QObject *keys = ui->quickTimeline->rootObject()->findChild<QObject *>("keys");
+    if(keys) {
+        QQmlProperty::write(keys, "visible", !checked);
+    }
+}
+
+void Timeline::on_flatKey_clicked() {
+    if(m_pKey) {
+        m_pKey->m_LeftTangent = m_pKey->m_Value;
+        m_pKey->m_RightTangent = m_pKey->m_Value;
+
+        m_pModel->updateController();
+    }
+}
+
+void Timeline::on_breakKey_clicked() {
+    if(m_pKey) {
+        m_pKey->m_LeftTangent = m_pKey->m_Value;
+        m_pKey->m_RightTangent = m_pKey->m_Value;
+
+        m_pModel->changed();
+    }
+}
+
+void Timeline::on_deleteKey_clicked() {
+    m_pModel->onRemoveKey(m_Row, m_Col, m_Ind);
 }

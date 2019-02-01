@@ -6,6 +6,8 @@
 
 #include <object.h>
 
+#include <animationcurve.h>
+
 class AnimationController;
 class AnimationClipModel;
 
@@ -49,6 +51,10 @@ private slots:
 
     void                    onRemoveProperty        ();
 
+    void                    onSelectKey             (int, int, int);
+
+    void                    onKeyChanged            ();
+
     void                    on_play_clicked         ();
 
     void                    on_previous_clicked     ();
@@ -63,6 +69,16 @@ private slots:
 
     void                    on_treeView_customContextMenuRequested  (const QPoint &pos);
 
+    void                    on_treeView_clicked     (const QModelIndex &index);
+
+    void                    on_curve_toggled        (bool checked);
+
+    void                    on_flatKey_clicked      ();
+
+    void                    on_breakKey_clicked     ();
+
+    void                    on_deleteKey_clicked    ();
+
 private:
     Ui::Timeline           *ui;
 
@@ -76,6 +92,11 @@ private:
 
     AnimationClipModel     *m_pModel;
 
+    AnimationCurve::KeyFrame *m_pKey;
+
+    int32_t                 m_Row;
+    int32_t                 m_Col;
+    int32_t                 m_Ind;
 };
 
 #endif // TIMELINE_H
