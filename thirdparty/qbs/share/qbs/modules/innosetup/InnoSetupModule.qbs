@@ -99,6 +99,7 @@ Module {
     Rule {
         id: innoSetupCompiler
         inputs: ["innosetup.iss"]
+        auxiliaryInputs: ["installable"]
 
         Artifact {
             fileTags: ["innosetup.exe", "application"]

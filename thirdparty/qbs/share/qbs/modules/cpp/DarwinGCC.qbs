@@ -48,6 +48,7 @@ UnixGCC {
 
     Probes.BinaryProbe {
         id: lipoProbe
+        condition: !_skipAllChecks
         names: [lipoName]
         platformPaths: {
             var paths = (xcode.present && xcode.devicePlatformPath)
@@ -63,6 +64,7 @@ UnixGCC {
 
     lipoName: "lipo"
     lipoPath: lipoPathPrefix + lipoName
+    property bool enableAggregationRules: product.aggregate && !product.multiplexConfigurationId
 
     targetVendor: "apple"
     targetSystem: "darwin"
@@ -85,6 +87,7 @@ UnixGCC {
     separateDebugInformation: true
     debugInfoBundleSuffix: ".dSYM"
     debugInfoSuffix: ".dwarf"
+    rpathOrigin: "@loader_path"
     useRPathLink: !minimumDarwinVersion
                   || Utilities.versionCompare(minimumDarwinVersion, "10.5") < 0
     rpathLinkFlag: "-L"
@@ -95,9 +98,9 @@ UnixGCC {
     sysrootFlags: sysroot ? ["-isysroot", sysroot] : []
 
     setupBuildEnvironment: {
-        for (var key in buildEnv) {
+        for (var key in product.cpp.buildEnv) {
             v = new ModUtils.EnvironmentVariable(key);
-            v.value = buildEnv[key];
+            v.value = product.cpp.buildEnv[key];
             v.set();
         }
     }
@@ -204,7 +207,7 @@ UnixGCC {
     property bool libcxxAvailable: qbs.toolchain.contains("clang") && cxxLanguageVersion !== "c++98"
 
     Rule {
-        condition: product.aggregate
+        condition: enableAggregationRules
         inputsFromDependencies: ["application"]
         multiplex: true
 
@@ -215,7 +218,7 @@ UnixGCC {
     }
 
     Rule {
-        condition: product.aggregate
+        condition: enableAggregationRules
         inputsFromDependencies: ["loadablemodule"]
         multiplex: true
 
@@ -227,11 +230,11 @@ UnixGCC {
     }
 
     Rule {
-        condition: product.aggregate
+        condition: enableAggregationRules
         inputsFromDependencies: ["dynamiclibrary"]
         multiplex: true
 
-        outputFileTags: ["bundle.input", "dynamiclibrary", "dynamiclibrary_copy", "primary",
+        outputFileTags: ["bundle.input", "dynamiclibrary", "dynamiclibrary_symbols", "primary",
                          "debuginfo_dll"]
         outputArtifacts: Darwin.lipoOutputArtifacts(product, inputs, "dynamiclibrary", "dll")
 
@@ -239,7 +242,7 @@ UnixGCC {
     }
 
     Rule {
-        condition: product.aggregate
+        condition: enableAggregationRules
         inputsFromDependencies: ["staticlibrary"]
         multiplex: true
 

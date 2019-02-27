@@ -114,7 +114,7 @@ Project {
             qbs.installSourceBase: product.buildDirectory
         }
     }
-/*
+
     AndroidApk {
         condition: isAndroid
         name: "${Project_Name}Apk"
@@ -123,6 +123,5 @@ Project {
         assetsDir: "${assetsPath}"
         manifestFile: "${manifestFile}"
     }
-*/
 }
 

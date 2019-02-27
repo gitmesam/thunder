@@ -28,6 +28,7 @@
 **
 ****************************************************************************/
 
+var Cpp = require("cpp.js");
 var File = require("qbs.File");
 var FileInfo = require("qbs.FileInfo");
 var ModUtils = require("qbs.ModUtils");
@@ -57,8 +58,16 @@ function handleCpuFeatures(input, flags) {
     }
 }
 
+function hasCxx17Option(input)
+{
+    // Probably this is not the earliest version to support the flag, but we have tested this one
+    // and it's a pain to find out the exact minimum.
+    return Utilities.versionCompare(input.cpp.compilerVersion, "19.12.25831") >= 0;
+}
+
 function addLanguageVersionFlag(input, args) {
-    var cxxVersion = input.cpp.cxxLanguageVersion;
+    var cxxVersion = Cpp.languageVersion(input.cpp.cxxLanguageVersion,
+                                         ["c++17", "c++14", "c++11", "c++98"], "C++");
     if (!cxxVersion)
         return;
 
@@ -70,6 +79,8 @@ function addLanguageVersionFlag(input, args) {
     var flag;
     if (cxxVersion === "c++14")
         flag = "/std:c++14";
+    else if (cxxVersion === "c++17" && hasCxx17Option(input))
+        flag = "/std:c++17";
     else if (cxxVersion !== "c++11" && cxxVersion !== "c++98")
         flag = "/std:c++latest";
     if (flag)
@@ -174,6 +185,9 @@ function prepareCompiler(project, product, inputs, outputs, input, output, expli
         }
     }
 
+    if (product.cpp.debugInformation && product.cpp.separateDebugInformation)
+        args.push("/Fd" + product.targetName + ".cl" + product.cpp.debugInfoSuffix);
+
     var objOutput = outputs.obj ? outputs.obj[0] : undefined
     args.push('/Fo' + FileInfo.toWindowsSeparators(objOutput.filePath))
     args.push(FileInfo.toWindowsSeparators(input.filePath))
@@ -261,6 +275,8 @@ function collectLibraryDependencies(product) {
     }
 
     function addExternalLibs(obj) {
+        if (!obj.cpp)
+            return;
         function ensureArray(a) {
             return Array.isArray(a) ? a : [];
         }
@@ -304,7 +320,7 @@ function collectLibraryDependencies(product) {
 
 function linkerSupportsWholeArchive(product)
 {
-    return Utilities.versionCompare(product.cpp.compilerVersion, "19.0.25123") >= 0
+    return Utilities.versionCompare(product.cpp.compilerVersion, "19.0.24215.1") >= 0
 }
 
 function handleDiscardProperty(product, flags) {
@@ -457,7 +473,7 @@ function prepareLinker(project, product, inputs, outputs, input, output) {
     cmd.workingDirectory = FileInfo.path(primaryOutput.filePath)
     cmd.responseFileUsagePrefix = '@';
     cmd.stdoutFilterFunction = function(output) {
-        return output.replace(/^ +Creating library.*\r\n$/, "");
+        return output.replace(/^(.*performing full link.*\r\n)? +Creating library.*\r\n$/, "");
     };
     commands.push(cmd);
 

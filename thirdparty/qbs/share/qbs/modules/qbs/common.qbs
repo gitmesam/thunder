@@ -51,7 +51,8 @@ Module {
     property bool enableDebugCode: buildVariant == "debug"
     property bool debugInformation: (buildVariant == "debug")
     property string optimization: (buildVariant == "debug" ? "none" : "fast")
-    readonly property stringList hostOS: undefined // set internally
+    readonly property string hostPlatform: undefined // set internally
+    readonly property stringList hostOS: Utilities.canonicalPlatform(hostPlatform)
     property string hostOSVersion: {
         if (hostOS && hostOS.contains("macos")) {
             return Utilities.getNativeSetting("/System/Library/CoreServices/ServerVersion.plist", "ProductVersion") ||
@@ -76,26 +77,26 @@ Module {
     readonly property int hostOSVersionMinor: hostOSVersionParts[1] || 0
     readonly property int hostOSVersionPatch: hostOSVersionParts[2] || 0
 
-    property stringList targetOS: hostOS
+    property string targetPlatform: hostPlatform
+    readonly property stringList targetOS: Utilities.canonicalPlatform(targetPlatform)
     property string pathListSeparator: hostOS.contains("windows") ? ";" : ":"
     property string pathSeparator: hostOS.contains("windows") ? "\\" : "/"
     property string nullDevice: hostOS.contains("windows") ? "NUL" : "/dev/null"
     property path shellPath: hostOS.contains("windows") ? windowsShellPath : "/bin/sh"
-    property string profile
-    property stringList toolchain: {
-        var tc;
+    property string profile: project.profile
+    property string toolchainType: {
         if (targetOS.contains("windows"))
-            tc = hostOS.contains("windows") ? "msvc" : "mingw";
-        else if (targetOS.contains("darwin"))
-            tc = hostOS.contains("macos") ? "xcode" : "clang";
-        else if (targetOS.contains("freebsd"))
-            tc = "clang";
-        else if (targetOS.contains("qnx"))
-            tc = "qcc";
-        else
-            tc = "gcc";
-        return Utilities.canonicalToolchain(tc);
+            return hostOS.contains("windows") ? "msvc" : "mingw";
+        if (targetOS.contains("darwin"))
+            return hostOS.contains("macos") ? "xcode" : "clang";
+        if (targetOS.contains("freebsd"))
+            return "clang";
+        if (targetOS.contains("qnx"))
+            return "qcc";
+        if (targetOS.containsAny(["haiku", "vxworks", "unix"]))
+            return "gcc";
     }
+    readonly property stringList toolchain: Utilities.canonicalToolchain(toolchainType)
     property string architecture
     property bool install: false
     property path installSourceBase
@@ -183,32 +184,15 @@ Module {
     property path windowsShellPath: FileInfo.fromWindowsSeparators(Environment.getEnv("COMSPEC")) || FileInfo.joinPaths(windowsSystemRoot, "System32", "cmd.exe")
     property string windowsPathVariable: hostOS.contains("windows") ? "PATH" : "WINEPATH"
 
-    property var commonRunEnvironment: {
-        var env = Environment.currentEnv();
-        if (targetOS.contains("windows")) {
-            var newEntry = FileInfo.toWindowsSeparators(FileInfo.joinPaths(installRoot,
-                                                                           installPrefix));
-            env[windowsPathVariable] = PathTools.prependOrSetPath(newEntry,
-                                                                  env[windowsPathVariable],
-                                                                  qbs.pathListSeparator);
-        } else if (hostOS.contains("macos") && targetOS.contains("macos")) {
-            env["DYLD_FRAMEWORK_PATH"] = PathTools.prependOrSetPath([
-                FileInfo.joinPaths(installRoot, installPrefix, "Library", "Frameworks"),
-                FileInfo.joinPaths(installRoot, installPrefix, "lib"),
-                FileInfo.joinPaths(installRoot, installPrefix)
-            ].join(pathListSeparator), env["DYLD_FRAMEWORK_PATH"], qbs.pathListSeparator);
-            env["DYLD_LIBRARY_PATH"] = PathTools.prependOrSetPath([
-                FileInfo.joinPaths(installRoot, installPrefix, "lib"),
-                FileInfo.joinPaths(installRoot, installPrefix, "Library", "Frameworks"),
-                FileInfo.joinPaths(installRoot, installPrefix)
-            ].join(pathListSeparator), env["DYLD_LIBRARY_PATH"], qbs.pathListSeparator);
-        } else if (hostOS.contains("unix") && targetOS.contains("unix")) {
-            env["LD_LIBRARY_PATH"] = PathTools.prependOrSetPath(
-                FileInfo.joinPaths(installRoot, installPrefix, "lib"), env["LD_LIBRARY_PATH"],
-                        qbs.pathListSeparator);
+    property var commonRunEnvironment: ({})
+    setupRunEnvironment: {
+        var env = product.qbs.commonRunEnvironment;
+        for (var i in env) {
+            var v = new ModUtils.EnvironmentVariable(i, product.qbs.pathListSeparator,
+                                                     product.qbs.hostOS.contains("windows"));
+            v.value = env[i];
+            v.set();
         }
-
-        return env;
     }
 
     // Properties that can be set for multiplexing products.

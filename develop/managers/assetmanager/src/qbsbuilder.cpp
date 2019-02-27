@@ -173,7 +173,7 @@ bool QbsBuilder::buildProject() {
             qbs.setWorkingDirectory(m_Project);
 
             QStringList args;
-            args << "resolve" << gMode << "profile:" + m_Profiles[0];
+            args << "resolve" << "qbs.defaultBuildVariant:" + gMode << "profile:" + m_Profiles[0];
 
             qDebug() << args;
 
@@ -186,7 +186,7 @@ bool QbsBuilder::buildProject() {
         {
             QStringList args;
             args << "build" << m_Settings;
-            args << "--products" << product << gMode << "profile:" + m_Profiles[0];
+            args << "--products" << product << "qbs.defaultBuildVariant:" + gMode << "profile:" + m_Profiles[0];
             qDebug() << args;
 
             m_pProcess->start(m_QBSPath.absoluteFilePath(), args);

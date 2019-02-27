@@ -42,18 +42,34 @@ Product {
     property stringList environment: ModUtils.flattenDictionary(qbs.commonRunEnvironment)
     property bool limitToSubProject: true
     property stringList wrapper: []
+    property string workingDir
+    property stringList auxiliaryInputs
+
     Depends {
         productTypes: "autotest"
         limitToSubProject: product.limitToSubProject
     }
+    Depends {
+        productTypes: auxiliaryInputs
+        limitToSubProject: product.limitToSubProject
+    }
+
     Rule {
         inputsFromDependencies: "application"
+        auxiliaryInputs: product.auxiliaryInputs
         Artifact {
             filePath: Utilities.getHash(input.filePath) + ".result.dummy" // Will never exist.
             fileTags: "autotest-result"
             alwaysUpdated: false
         }
         prepare: {
+            // TODO: This is hacky. Possible solution: Add autotest tag to application
+            // in autotest module and have that as inputsFromDependencies instead of application.
+            if (!input.product.type.contains("autotest")) {
+                var cmd = new JavaScriptCommand();
+                cmd.silent = true;
+                return cmd;
+            }
             var commandFilePath;
             var installed = input.moduleProperty("qbs", "install");
             if (installed)
@@ -66,6 +82,8 @@ Product {
             var cmd = new Command(fullCommandLine[0], fullCommandLine.slice(1));
             cmd.description = "Running test " + input.fileName;
             cmd.environment = product.environment;
+            cmd.workingDirectory = product.workingDir ? product.workingDir
+                                                      : FileInfo.path(commandFilePath);
             return cmd;
         }
     }

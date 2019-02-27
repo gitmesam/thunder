@@ -45,12 +45,13 @@ CppModule {
 
     Probes.BinaryProbe {
         id: compilerPathProbe
-        condition: !toolchainInstallPath
+        condition: !toolchainInstallPath && !_skipAllChecks
         names: ["cl"]
     }
 
     Probes.MsvcProbe {
         id: msvcProbe
+        condition: !_skipAllChecks
         compilerFilePath: compilerPath
         enableDefinesByLanguage: enableCompilerDefinesByLanguage
         preferredArchitecture: qbs.architecture
@@ -109,9 +110,6 @@ CppModule {
                                                                   : undefined
     architecture: qbs.architecture
     endianness: "little"
-    staticLibraryPrefix: ""
-    dynamicLibraryPrefix: ""
-    executablePrefix: ""
     staticLibrarySuffix: ".lib"
     dynamicLibrarySuffix: ".dll"
     executableSuffix: ".exe"
@@ -129,9 +127,9 @@ CppModule {
     property var buildEnv: msvcProbe.buildEnv
 
     setupBuildEnvironment: {
-        for (var key in buildEnv) {
+        for (var key in product.cpp.buildEnv) {
             var v = new ModUtils.EnvironmentVariable(key, ';');
-            v.prepend(buildEnv[key]);
+            v.prepend(product.cpp.buildEnv[key]);
             v.set();
         }
     }
@@ -262,24 +260,36 @@ CppModule {
         multiplex: true
         inputs: ["obj"]
         inputsFromDependencies: ["staticlibrary", "dynamiclibrary_import"]
-
-        Artifact {
-            fileTags: ["staticlibrary"]
-            filePath: product.destinationDirectory + "/" + PathTools.staticLibraryFilePath(product)
+        outputFileTags: ["staticlibrary", "debuginfo_cl"]
+        outputArtifacts: {
+            var artifacts = [
+                {
+                    fileTags: ["staticlibrary"],
+                    filePath: FileInfo.joinPaths(product.destinationDirectory,
+                                                 PathTools.staticLibraryFilePath(product))
+                }
+            ];
+            if (product.cpp.debugInformation && product.cpp.separateDebugInformation) {
+                artifacts.push({
+                    fileTags: ["debuginfo_cl"],
+                    filePath: product.targetName + ".cl" + product.cpp.debugInfoSuffix
+                });
+            }
+            return artifacts;
         }
-
         prepare: {
             var args = ['/nologo']
-            var nativeOutputFileName = FileInfo.toWindowsSeparators(output.filePath)
+            var lib = outputs["staticlibrary"][0];
+            var nativeOutputFileName = FileInfo.toWindowsSeparators(lib.filePath)
             args.push('/OUT:' + nativeOutputFileName)
             for (var i in inputs.obj) {
                 var fileName = FileInfo.toWindowsSeparators(inputs.obj[i].filePath)
                 args.push(fileName)
             }
             var cmd = new Command("lib.exe", args);
-            cmd.description = 'creating ' + output.fileName;
+            cmd.description = 'creating ' + lib.fileName;
             cmd.highlight = 'linker';
-            cmd.workingDirectory = FileInfo.path(output.filePath)
+            cmd.workingDirectory = FileInfo.path(lib.filePath)
             cmd.responseFileUsagePrefix = '@';
             return cmd;
          }
